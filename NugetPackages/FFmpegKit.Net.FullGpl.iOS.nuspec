@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>FFmpegKit.Net.FullGpl.iOS</id>
+    <version>6.0.0.1</version>
+    <title>Xamarin bindings to the native FFmpegKit FFmpeg iOS SDK.</title>
+    <authors>s.bokatuk</authors>
+    <owners>s.bokatuk</owners>
+    <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <icon>images/icon.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://github.com/sbokatuk/FFMpegKit.Net</projectUrl>
+    <description>MAUI iOS Xamarin bindings for FFmpegKit FFmpeg SDK. Alows to use The FFmpegKit FFmpeg SDK in your app.</description>
+    <summary>.Net Xamarin FFmpegKit FFmpeg iOS SDK, see https://github.com/arthenica/ffmpeg-kit</summary>
+    <tags>Xamarin FFmpegKit .Net FFmpeg iOS SDK Xamarin Xamarin.iOS MAUI MAUI.iOS .Net Binding</tags>
+    <dependencies>
+      <group targetFramework="net7.0-ios16.1" />
+      <group targetFramework="net8.0-ios17.2" />
+    </dependencies>
+  </metadata>
+  <files>
+      <file src="fullgpl/sdk.png" target="images/icon.png" />
+      <file src="fullgplios/README.md" target="" />
+      <file src="fullgplios/README.txt" target="" />
+      <file src="fullgplios/lib/net7.0-ios16.1/**" target="lib/net7.0-ios16.1" />
+	  <file src="fullgplios/lib/net8.0-ios17.2/**" target="lib/net8.0-ios17.2" />
+    </files>
+</package>

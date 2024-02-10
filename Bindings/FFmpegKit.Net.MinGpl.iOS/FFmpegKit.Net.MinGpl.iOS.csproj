@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>6.0.0.8</Version>
+    <authors>s.bokatuk</authors>
+    <owners>s.bokatuk</owners>
+    <title>Xamarin bindings to the native FFmpegKit FFmpeg iOS SDK.</title>
+    <projectUrl>https://github.com/sbokatuk/FFMpegKit.Net</projectUrl>
+    <description>MAUI .Net iOS Xamarin bindings for FFmpegKit FFmpeg SDK. Alows to use The FFmpegKit FFmpeg SDK in your app.</description>
+    <summary>.Net Xamarin FFmpegKit FFmpeg iOS SDK, see https://github.com/arthenica/ffmpeg-kit</summary>
+    <tags>Xamarin FFmpegKit .Net FFmpeg iOS SDK Xamarin Xamarin.iOS MAUI MAUI.iOS .Net Binding</tags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>FFmpegKit.Net.MinGpl.iOS</PackageId>
+    <AssemblyName>FFmpegKit.Net.MinGpl.iOS</AssemblyName>
+    <SynchReleaseVersion>false</SynchReleaseVersion>
+    <ReleaseVersion>4.2.6.1</ReleaseVersion>
+    <TargetFramework>net8.0-ios</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>true</ImplicitUsings>
+    <IsBindingProject>true</IsBindingProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+    <ObjcBindingCoreSource Include="StructsAndEnums.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="FFmpegKit.Net.MinGpl.iOS.targets">
+      <PackagePath>build/FFmpegKit.Net.MinGpl.iOS.targets</PackagePath>
+    </Content>
+  </ItemGroup>
+</Project>

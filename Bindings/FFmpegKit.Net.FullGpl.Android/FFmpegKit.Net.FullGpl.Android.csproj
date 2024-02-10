@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>6.0.0.8</Version>
+    <authors>s.bokatuk</authors>
+    <owners>s.bokatuk</owners>
+    <title>Xamarin bindings to the native FFmpegKit FFmpeg Android SDK.</title>
+    <projectUrl>https://github.com/sbokatuk/FFMpegKit.Net</projectUrl>
+    <description>MAUI Android Xamarin bindings for FFmpegKit FFmpeg SDK. Alows to use The FFmpegKit FFmpeg SDK in your app.</description>
+    <summary>.Net Xamarin FFmpegKit FFmpeg Android SDK, see https://github.com/arthenica/ffmpeg-kit</summary>
+    <tags>Xamarin FFmpegKit .Net FFmpeg Android SDK Xamarin Xamarin.Android MAUI MAUI.Android .Net Binding</tags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>FFmpegKit.Net.FullGpl.Android</PackageId>
+    <AssemblyName>FFmpegKit.Net.FullGpl.Android</AssemblyName>
+    <SynchReleaseVersion>false</SynchReleaseVersion>
+    <ReleaseVersion>4.2.6.1</ReleaseVersion>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="FFmpegKit.Net.FullGpl.Android.targets" PackagePath="build/NMSC.Android.targets" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>6.0.0.8</Version>
+    <authors>s.bokatuk</authors>
+    <owners>s.bokatuk</owners>
+    <title>Xamarin bindings to the native FFmpegKit FFmpeg Mac SDK.</title>
+    <projectUrl>https://github.com/sbokatuk/FFMpegKit.Net</projectUrl>
+    <description>MAUI .Net Mac Xamarin bindings for FFmpegKit FFmpeg SDK. Alows to use The FFmpegKit FFmpeg SDK in your app.</description>
+    <summary>.Net Xamarin FFmpegKit FFmpeg Mac SDK, see https://github.com/arthenica/ffmpeg-kit</summary>
+    <tags>Xamarin FFmpegKit .Net FFmpeg Mac SDK Xamarin Xamarin.Mac MAUI MAUI.Mac .Net Binding</tags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>FFmpegKit.Net.Video.Mac</PackageId>
+    <AssemblyName>FFmpegKit.Net.Video.Mac</AssemblyName>
+    <SynchReleaseVersion>false</SynchReleaseVersion>
+    <ReleaseVersion>4.2.6.1</ReleaseVersion>
+    <TargetFramework>net8.0-maccatalyst</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>true</ImplicitUsings>
+    <IsBindingProject>true</IsBindingProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+    <ObjcBindingCoreSource Include="StructsAndEnums.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="FFmpegKit.Net.Video.Mac.targets">
+      <PackagePath>build/FFmpegKit.Net.Video.Mac.targets</PackagePath>
+    </Content>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Files Include="$(MSBuildThisFileDirectory)/../native/lib/android/*.*" />
+  </ItemGroup>
+  <Target Name="CopyFiles" BeforeTargets="GetFrameworkPaths">
+    <Copy SourceFiles="@(Files)" DestinationFolder="$(MSBuildThisFileDirectory)/../lib/net8.0-android34.0/" />
+    <Copy SourceFiles="@(Files)" DestinationFolder="$(MSBuildThisFileDirectory)/../lib/net7.0-android33.0/" />
+  </Target>
+</Project>

@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>FFmpegKit.Net.Video.Android</id>
+    <version>6.0.0.1</version>
+    <title>Xamarin bindings to the native FFmpegKit FFmpeg Android SDK.</title>
+    <authors>s.bokatuk</authors>
+    <owners>s.bokatuk</owners>
+    <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <icon>images/icon.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://github.com/sbokatuk/FFMpegKit.Net</projectUrl>
+    <description>MAUI Android Xamarin bindings for FFmpegKit FFmpeg SDK. Alows to use The FFmpegKit FFmpeg SDK in your app.</description>
+    <summary>.Net Xamarin FFmpegKit FFmpeg Android SDK, see https://github.com/arthenica/ffmpeg-kit</summary>
+    <tags>Xamarin FFmpegKit .Net FFmpeg Android SDK Xamarin Xamarin.Android MAUI MAUI.Android .Net Binding</tags>
+    <dependencies>
+      <group targetFramework="net7.0-android33.0" />
+      <group targetFramework="net8.0-android34.0" />
+    </dependencies>
+  </metadata>
+  <files>
+      <file src="video/sdk.png" target="images/icon.png" />
+      <file src="videoandroid/README.md" target="" />
+      <file src="videoandroid/README.txt" target="" />
+      <file src="videoandroid/lib/net7.0-android33.0/**" target="lib/net7.0-android33.0" />
+	  <file src="videoandroid/lib/net8.0-android34.0/**" target="lib/net8.0-android34.0" />
+    </files>
+</package>
