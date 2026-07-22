@@ -4,10 +4,12 @@ namespace FFmpegKit.Net.PackageTests;
 /// Shape checks for the packed FFmpegKit.Net.Full package - the cross-platform client.
 /// </summary>
 /// <remarks>
-/// Unlike the two bindings, this package carries no native payload of its own: its whole job is
-/// to depend on the right platform binding per target framework, so that is what these tests
-/// verify - the assembly is present, and the nuspec's per-framework dependency groups point at
-/// FFmpegKit.Net.Full.Android / .iOS rather than, say, a different variant.
+/// This package carries no native payload and does not embed either binding: its whole job is to
+/// depend on the right *external* one - FFmpegKit.Net.Full.Android / .iOS, published to nuget.org
+/// from sbokatuk/FFmpegKit.Android and sbokatuk/FFmpegKit.iOS - per target framework, at the exact
+/// version pinned in Directory.Build.props. That is what these tests verify: the assembly is
+/// present, and the nuspec's per-framework dependency groups point at the right package and
+/// version rather than, say, a different variant or a stale pin.
 /// </remarks>
 public class CrossPlatformPackageTests
 {
@@ -24,7 +26,7 @@ public class CrossPlatformPackageTests
     }
 
     [Fact]
-    public void Every_android_target_framework_depends_on_the_android_binding()
+    public void Every_android_target_framework_depends_on_the_pinned_android_binding_version()
     {
         using var package = Packages.OpenPackage(Packages.CrossPlatformPackageId);
         var nuspec = Packages.ReadNuspec(package, Packages.CrossPlatformPackageId);
@@ -35,11 +37,12 @@ public class CrossPlatformPackageTests
 
             Assert.Contains(Packages.AndroidPackageId, ids);
             Assert.DoesNotContain(Packages.IosPackageId, ids);
+            Assert.Equal(Packages.AndroidPackageVersion, Packages.DependencyVersion(nuspec, tfm, Packages.AndroidPackageId));
         }
     }
 
     [Fact]
-    public void Every_ios_target_framework_depends_on_the_ios_binding()
+    public void Every_ios_target_framework_depends_on_the_pinned_ios_binding_version()
     {
         using var package = Packages.OpenPackage(Packages.CrossPlatformPackageId);
         var nuspec = Packages.ReadNuspec(package, Packages.CrossPlatformPackageId);
@@ -50,6 +53,7 @@ public class CrossPlatformPackageTests
 
             Assert.Contains(Packages.IosPackageId, ids);
             Assert.DoesNotContain(Packages.AndroidPackageId, ids);
+            Assert.Equal(Packages.IosPackageVersion, Packages.DependencyVersion(nuspec, tfm, Packages.IosPackageId));
         }
     }
 

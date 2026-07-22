@@ -2,46 +2,44 @@
 
   <!--
     ============================================================================
-    Native FFmpegKit version pins
+    External binding package pins
     ============================================================================
-    Android and iOS get their native binaries from different upstreams with different version
-    schemes, and neither tracks FFmpeg's own numbering directly - see the README and
-    src/FFmpegKit.Net.Android/Jars/FetchJars.sh / build/FetchXcFrameworks.sh for where each
-    number is used.
+    This repository does not build the Android or iOS bindings itself: it depends on the
+    FFmpegKit.Net.<Variant>.Android and FFmpegKit.Net.<Variant>.iOS packages already published to
+    nuget.org from sbokatuk/FFmpegKit.Android and sbokatuk/FFmpegKit.iOS respectively. Those two
+    repositories version independently of each other and of this one - see their own READMEs -
+    so bumping one pin here does not imply bumping the other.
   -->
   <PropertyGroup>
     <!--
-      The FFmpeg build every package advertises. Package versions are based on this, not on
-      either native repository's own release numbers, because this is what determines behaviour.
+      The FFmpeg build this repository's own packages advertise as wrapping. Not read by anything
+      that talks to nuget.org - it only feeds VersionPrefix below - but kept aligned with the
+      Android/iOS pins so the three numbers do not drift apart in the READMEs and package
+      descriptions.
     -->
     <FFmpegVersion>8.1.2</FFmpegVersion>
 
     <!--
-      iOS binaries come from sk3llo/ffmpeg_kit_flutter (the only source still publishing all
-      eight xcframework variants for Apple platforms), which tags its releases with the FFmpeg
-      version directly - see build/FetchXcFrameworks.sh.
+      Exact versions of the external bindings to depend on, checked via nuget.org's search API
+      (the flat-container versions list also includes older, unlisted releases and is not safe to
+      read the latest version from directly - see docs/BUILD.md). Pinned with an exact bracket
+      range in the .csproj ([version]) rather than left floating, so a new upstream release does
+      not change what this repository packs until this pin is bumped deliberately.
     -->
-    <FFmpegKitIosNativeVersion>8.1.2</FFmpegKitIosNativeVersion>
+    <FFmpegKitAndroidPackageVersion>8.1.2.4</FFmpegKitAndroidPackageVersion>
+    <FFmpegKitIosPackageVersion>8.1.2.1</FFmpegKitIosPackageVersion>
 
     <!--
-      Android binaries come from ffmpegkit-maintained/ffmpeg on Maven Central, whose own release
-      numbering does not track FFmpeg's - FFmpegKit 8.1.7 packages FFmpeg n8.1.2. This is the
-      FFmpegKit release, used to name the .aar to download; see
-      src/FFmpegKit.Net.Android/Jars/FetchJars.sh and build/native-versions.tsv.
-    -->
-    <FFmpegKitAndroidNativeVersion>8.1.7</FFmpegKitAndroidNativeVersion>
-
-    <!--
-      Belongs to this repository, not to either native build. Increments whenever the bindings,
-      the cross-platform layer or the packaging change while FFmpegVersion stays put.
+      Belongs to this repository, not to either external binding. Increments whenever the
+      cross-platform layer or the MAUI package changes while FFmpegVersion stays put.
     -->
     <FFmpegKitBindingRevision>1</FFmpegKitBindingRevision>
     <VersionPrefix>$(FFmpegVersion).$(FFmpegKitBindingRevision)</VersionPrefix>
 
     <!--
       Which FFmpegKit variant to build: Audio, Full, FullGpl, Https, HttpsGpl, Min, MinGpl, Video.
-      CI builds each of these in turn for every variant-parameterized project (the two bindings,
-      the cross-platform client and the MAUI package).
+      CI builds each of these in turn for both variant-parameterized projects (the cross-platform
+      client and the MAUI package).
     -->
     <FFmpegKitBuildType Condition=" '$(FFmpegKitBuildType)' == '' ">Video</FFmpegKitBuildType>
 
@@ -53,11 +51,10 @@
     <RepositoryType>git</RepositoryType>
     <!--
       No PackageLicenseExpression here: it is not one value for the whole repository. The C#
-      source is MIT throughout, but the two binding packages also ship native FFmpeg binaries
-      that are LGPL-3.0 or GPL-3.0 depending on the variant, so the expression is built per
-      variant in FFmpegKit.Net.Android.csproj / FFmpegKit.Net.iOS.csproj. The cross-platform and
-      MAUI packages carry no native payload of their own, but declare the same expression as the
-      binding they pull in, since that is what a consumer actually ends up with transitively.
+      source is MIT, but each package transitively pulls in an external binding whose native
+      FFmpeg binaries are LGPL-3.0 or GPL-3.0 depending on the variant, so the expression is built
+      per variant in FFmpegKit.Net.csproj / FFmpegKit.Net.Maui.csproj - that is what a consumer
+      actually ends up with, even though neither project embeds any native payload itself.
     -->
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 
@@ -88,10 +85,8 @@
     build/BuildNugets.sh and build/merge-packages.py. FFmpegKitSdkBand selects which pass a given
     build is.
 
-    The platform version in each target framework is pinned deliberately. Bare 'net8.0-android'
-    resolves to android21.0, which produces a binding assembly with no .aar payload - it compiles,
-    packs and installs, and fails only at runtime. The same applies to 'net8.0-ios', where an
-    unpinned default also changes the lib/<tfm>/ folder name a workload update would silently move.
+    The platform version in each target framework is pinned deliberately, matching what the
+    external Android/iOS packages themselves target - a mismatch would fail restore.
   -->
   <PropertyGroup>
     <FFmpegKitSdkBand Condition=" '$(FFmpegKitSdkBand)' == '' ">net9</FFmpegKitSdkBand>
@@ -107,14 +102,12 @@
     ============================================================================
     Per-variant obj/ and bin/
     ============================================================================
-    All eight variants of every variant-parameterized project are built one after another in the
-    same working copy, and they differ only in which native payload gets linked in - a shared
-    intermediate output would let one variant's binaries end up in the next one's package.
-    Applies to every project whose output depends on FFmpegKitBuildType.
+    Both variant-parameterized projects are built one after another, for all eight variants, in
+    the same working copy, and they differ only in which external binding version gets resolved -
+    a shared intermediate output would let one variant's resolved assemblies end up cached against
+    the next one's package.
   -->
   <PropertyGroup Condition="
-      '$(MSBuildProjectName)' == 'FFmpegKit.Net.Android' Or
-      '$(MSBuildProjectName)' == 'FFmpegKit.Net.iOS' Or
       '$(MSBuildProjectName)' == 'FFmpegKit.Net' Or
       '$(MSBuildProjectName)' == 'FFmpegKit.Net.Maui'">
     <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)/obj/$(FFmpegKitBuildType)/</BaseIntermediateOutputPath>

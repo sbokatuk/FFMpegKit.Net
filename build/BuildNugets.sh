@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Packs every FFmpegKit.Net package - both bindings, the cross-platform client and the MAUI
-# package - for all eight variants, for net8, net9 and net10.
+# Packs FFmpegKit.Net's own two packages - the cross-platform client and the MAUI package - for
+# all eight variants, for net8, net9 and net10.
+#
+# This repository does not build the Android or iOS bindings: both projects depend on
+# FFmpegKit.Net.<Variant>.Android / .iOS, already published to nuget.org from
+# sbokatuk/FFmpegKit.Android and sbokatuk/FFmpegKit.iOS, pinned to an exact version in
+# Directory.Build.props (FFmpegKitAndroidPackageVersion / FFmpegKitIosPackageVersion).
 #
 # Usage:
-#   ./build/BuildNugets.sh                                  # version from Directory.Build.props
-#   ./build/BuildNugets.sh 8.1.2-beta.4                      # explicit package version
-#   ./build/BuildNugets.sh 8.1.2-beta.4 android              # only the Android binding
-#   ./build/BuildNugets.sh 8.1.2-beta.4 apple                # only the iOS binding + cross-platform + Maui
-#   ./build/BuildNugets.sh 8.1.2-beta.4 all 8.1.7 8.1.2      # override the Android/iOS native versions
+#   ./build/BuildNugets.sh                              # version from Directory.Build.props
+#   ./build/BuildNugets.sh 8.1.2-beta.4                  # explicit package version
+#   ./build/BuildNugets.sh 8.1.2-beta.4 8.1.2.4 8.1.2.1  # override the Android/iOS package pins
 #
-# The scope argument exists for CI, which packs Android on a Linux runner and the Apple-only
-# projects on a macOS one - the cross-platform client and the MAUI package multi-target Android
-# *and* iOS together, so restoring either needs the iOS workload regardless of which platform's
-# code is being exercised. It defaults to 'all', minus the Apple projects when not running on
-# macOS.
-#
-# Run the native fetch scripts first - src/FFmpegKit.Net.Android/Jars/FetchJars.sh and, on macOS,
-# build/FetchXcFrameworks.sh - or the bindings will pack without their native payload.
+# Requires macOS: both packages multi-target Android and iOS together, so restoring either needs
+# the iOS workload regardless of which platform's code is being exercised.
 #
 # Packages are written to ./artifacts.
 #
@@ -27,10 +24,6 @@ set -euo pipefail
 # and the results merged with build/merge-packages.py. global.json pins the .NET 9 SDK, and the
 # SDK is resolved from the working directory, so the second pass runs from a scratch directory
 # carrying its own global.json.
-#
-# With scope 'apple', the Android package for the variant being built must already be in
-# ./artifacts (CI downloads it from the pack-android job) - FFmpegKit.Net.<Variant> depends on
-# both platform bindings by PackageReference, so it can only restore once both are present.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -41,6 +34,11 @@ VARIANTS="Audio Full FullGpl Https HttpsGpl Min MinGpl Video"
 PASS1_BAND="net9"
 PASS2_BAND="net10"
 PASS2_SDK="10.0.100"
+
+if [ "$(uname -s)" != "Darwin" ]; then
+    echo "::error::this repository's packages multi-target Android and iOS together and require macOS with Xcode" >&2
+    exit 1
+fi
 
 VERSION="${1:-}"
 VERSION_ARG=""
@@ -54,42 +52,12 @@ if [ -n "${VERSION}" ]; then
     VERSION_ARG="-p:Version=${VERSION}"
 fi
 
-SCOPE="${2:-all}"
-case "${SCOPE}" in
-    all|android|apple) ;;
-    *)
-        echo "error: scope must be all, android or apple (got '${SCOPE}')" >&2
-        exit 1
-        ;;
-esac
-
 NATIVE_ARGS=""
+if [ -n "${2:-}" ]; then
+    NATIVE_ARGS="${NATIVE_ARGS} -p:FFmpegKitAndroidPackageVersion=${2}"
+fi
 if [ -n "${3:-}" ]; then
-    NATIVE_ARGS="${NATIVE_ARGS} -p:FFmpegKitAndroidNativeVersion=${3}"
-fi
-if [ -n "${4:-}" ]; then
-    NATIVE_ARGS="${NATIVE_ARGS} -p:FFmpegKitIosNativeVersion=${4}"
-fi
-
-IS_MACOS=false
-[ "$(uname -s)" = "Darwin" ] && IS_MACOS=true
-
-PACK_ANDROID=false
-PACK_APPLE=false
-
-if [ "${SCOPE}" = "all" ] || [ "${SCOPE}" = "android" ]; then
-    PACK_ANDROID=true
-fi
-
-if [ "${SCOPE}" = "all" ] || [ "${SCOPE}" = "apple" ]; then
-    if [ "${IS_MACOS}" = true ]; then
-        PACK_APPLE=true
-    elif [ "${SCOPE}" = "apple" ]; then
-        echo "::error::scope 'apple' requires macOS with Xcode" >&2
-        exit 1
-    else
-        echo "==> not macOS: skipping the iOS, cross-platform and Maui builds"
-    fi
+    NATIVE_ARGS="${NATIVE_ARGS} -p:FFmpegKitIosPackageVersion=${3}"
 fi
 
 mkdir -p "${OUTPUT}"
@@ -134,18 +102,11 @@ pack_and_merge() {
 }
 
 for variant in ${VARIANTS}; do
-    if [ "${PACK_ANDROID}" = true ]; then
-        pack_and_merge "${ROOT}/src/FFmpegKit.Net.Android/FFmpegKit.Net.Android.csproj" "${variant}"
-    fi
-
-    if [ "${PACK_APPLE}" = true ]; then
-        pack_and_merge "${ROOT}/src/FFmpegKit.Net.iOS/FFmpegKit.Net.iOS.csproj" "${variant}"
-
-        # Both PackageReferences (Android and iOS) must already resolve from ./artifacts - see
-        # the usage note above about scope 'apple' needing the Android package placed there first.
-        pack_and_merge "${ROOT}/src/FFmpegKit.Net/FFmpegKit.Net.csproj" "${variant}"
-        pack_and_merge "${ROOT}/src/FFmpegKit.Net.Maui/FFmpegKit.Net.Maui.csproj" "${variant}"
-    fi
+    # FFmpegKit.Net.Maui depends on FFmpegKit.Net (this same repository, by PackageReference), so
+    # it must be packed after - restore resolves it from ./artifacts via the local-artifacts
+    # source in NuGet.config.
+    pack_and_merge "${ROOT}/src/FFmpegKit.Net/FFmpegKit.Net.csproj" "${variant}"
+    pack_and_merge "${ROOT}/src/FFmpegKit.Net.Maui/FFmpegKit.Net.Maui.csproj" "${variant}"
 done
 
 echo "==> packages in ${OUTPUT}:"

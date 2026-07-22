@@ -65,9 +65,8 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
-          pattern: nuget-packages-*
+          name: nuget-packages
           path: artifacts
-          merge-multiple: true
 
       # Deliberately immediately before the push: the issued key is valid for one hour, and each
       # OIDC token can be exchanged exactly once.
@@ -91,7 +90,7 @@ jobs:
             echo "### Published \`${{ needs.version.outputs.version }}\` to nuget.org"
             echo
             for variant in Audio Full FullGpl Https HttpsGpl Min MinGpl Video; do
-              for suffix in Android iOS "" Maui; do
+              for suffix in "" Maui; do
                 id="FFmpegKit.Net.${variant}${suffix:+.${suffix}}"
                 echo "- [${id}](https://www.nuget.org/packages/${id}/${{ needs.version.outputs.version }})"
               done

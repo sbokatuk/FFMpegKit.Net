@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.resolve.outputs.version }}
-      android-native-version: ${{ steps.resolve.outputs.android-native-version }}
-      ios-native-version: ${{ steps.resolve.outputs.ios-native-version }}
       prerelease: ${{ steps.resolve.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
@@ -27,31 +25,15 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           if ! printf '%s' "${version}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$'; then
-            echo "::error::tag '${GITHUB_REF_NAME}' does not look like a version (expected e.g. v8.1.2.4)"
+            echo "::error::tag '${GITHUB_REF_NAME}' does not look like a version (expected e.g. v8.1.2.1)"
             exit 1
           fi
 
-          # Tags name the FFmpeg version, not either binding's own native release number:
-          # v8.1.2.4 is FFmpeg 8.1.2, binding revision 4. The fourth component and any prerelease
-          # suffix are dropped to get the FFmpeg version.
-          ffmpeg_version=$(printf '%s' "${version%%-*}" | cut -d. -f1-3)
-
-          # iOS: ffmpeg_kit_flutter tags its releases with the FFmpeg version directly - no lookup.
-          echo "ios-native-version=${ffmpeg_version}" >> "$GITHUB_OUTPUT"
-
-          # Android: the FFmpegKit release that packages this FFmpeg version is looked up from
-          # build/native-versions.tsv, since the two numbering schemes do not track each other -
-          # FFmpegKit 8.1.7 packages FFmpeg n8.1.2.
-          android_native=$(awk -F'\t' -v v="${ffmpeg_version}" '$1 == v { print $2 }' build/native-versions.tsv)
-          if [ -z "${android_native}" ]; then
-            echo "::error::FFmpeg ${ffmpeg_version} is not in build/native-versions.tsv - known builds:"
-            grep -v '^#' build/native-versions.tsv >&2
-            exit 1
-          fi
-          echo "android-native-version=${android_native}" >> "$GITHUB_OUTPUT"
-
+          # This repository's own version - FFmpegVersion.BindingRevision - not either external
+          # binding's release number. The Android/iOS pins used are whatever is currently in
+          # Directory.Build.props (or the workflow_call overrides, unused here); a tag does not
+          # imply changing them, since the two version independently of this repository.
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "FFmpeg ${ffmpeg_version} (Android FFmpegKit ${android_native}, iOS ${ffmpeg_version})" >> "$GITHUB_STEP_SUMMARY"
 
           case "${version}" in
             *-*) prerelease=true ;;
@@ -66,8 +48,6 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.version }}
-      android-native-version: ${{ needs.version.outputs.android-native-version }}
-      ios-native-version: ${{ needs.version.outputs.ios-native-version }}
 
   publish:
     name: publish to nuget.org and create release
@@ -95,9 +75,8 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
-          pattern: nuget-packages-*
+          name: nuget-packages
           path: artifacts
-          merge-multiple: true
 
       # nuget.org is published to first: a GitHub release that links to packages which failed to
       # upload would be worse than a release that is created a moment late.
@@ -123,6 +102,9 @@ jobs:
           notes="docs/release-notes/${VERSION}.md"
           [ -f "${notes}" ] || notes="docs/release-notes/${VERSION%%-*}.md"
 
+          android_pin=$(grep -oPm1 '(?<=<FFmpegKitAndroidPackageVersion>)[^<]+' Directory.Build.props)
+          ios_pin=$(grep -oPm1 '(?<=<FFmpegKitIosPackageVersion>)[^<]+' Directory.Build.props)
+
           {
             if [ -f "${notes}" ]; then
               echo "==> using curated notes from ${notes}" >&2
@@ -144,8 +126,9 @@ jobs:
 
             echo "## Packages"
             echo
-            echo "Every variant below ships as \`.Android\`, \`.iOS\`, a cross-platform package"
-            echo "with no suffix, and \`.Maui\` - see the root README for what each is."
+            echo "Every variant below ships as a cross-platform package with no suffix, and as"
+            echo "\`.Maui\`; both depend on FFmpegKit.Net.<Variant>.Android \`${android_pin}\` and"
+            echo "FFmpegKit.Net.<Variant>.iOS \`${ios_pin}\` - see the root README."
             echo
             echo "| Variant | License |"
             echo "| --- | --- |"
@@ -163,7 +146,7 @@ jobs:
             echo
             echo "## Licensing"
             echo
-            echo "The binding and client code is MIT, but the bundled native FFmpeg binaries are"
+            echo "The code in this repository is MIT, but the bundled native FFmpeg binaries are"
             echo "not. The \`-Gpl\` variants enable x264/x265/xvid/vidstab and are **GPL-3.0**; the"
             echo "rest are LGPL-3.0. If your app is closed-source, use a non-GPL variant. Each"
             echo "package ships the applicable texts under \`licenses/\`."

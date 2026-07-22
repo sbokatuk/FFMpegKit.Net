@@ -400,14 +400,6 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
-# FFmpegKit.Net
-# Native payloads dropped into the binding projects by the fetch scripts - reproducible from the
-# native version pins in Directory.Build.props via src/FFmpegKit.Net.Android/Jars/FetchJars.sh
-# and build/FetchXcFrameworks.sh. Too large to commit, and not tied to a single revision anyway.
-src/FFmpegKit.Net.Android/Jars/*.aar
-src/FFmpegKit.Net.Android/Jars/*.jar
-src/FFmpegKit.Net.iOS/libs/
-
 # Device/simulator test output
 device-tests-logcat.txt
 device-tests-simulator.log

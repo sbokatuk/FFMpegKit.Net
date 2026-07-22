@@ -6,17 +6,22 @@
     hand. See FFmpegKit.cs, FFprobeKit.cs and FFmpegKitConfig.cs for what it covers, and the
     Platforms/Android and Platforms/iOS folders for the two implementations.
 
+    The Android and iOS bindings themselves are NOT built in this repository - they are
+    FFmpegKit.Net.<Variant>.Android / .iOS, published to nuget.org from sbokatuk/FFmpegKit.Android
+    and sbokatuk/FFmpegKit.iOS respectively. This project only depends on them, pinned to an exact
+    version in Directory.Build.props (FFmpegKitAndroidPackageVersion / FFmpegKitIosPackageVersion).
+
     Deliberately no MAUI dependency, so plain .NET for Android and .NET for iOS apps can use this.
     The MAUI-specific glue lives in FFmpegKit.Net.Maui.
 
     Both platforms' target frameworks are listed together, which is why this can only be packed on
-    macOS - restoring the iOS legs needs the iOS workload. See build/BuildNugets.sh.
+    macOS - restoring the iOS leg needs the iOS workload. See build/BuildNugets.sh.
 
-    Parameterized by FFmpegKitBuildType like the two bindings: Ffmpegkit.Ios.FFmpegKit and
+    Parameterized by FFmpegKitBuildType like the external bindings: Ffmpegkit.Ios.FFmpegKit and
     Ffmpegkit.Droid.FFmpegKit are identical across variants, but each variant is a distinct
     assembly (FFmpegKit.Net.Video.iOS vs FFmpegKit.Net.Full.iOS, ...), so a cross-platform
     assembly built against one is bound to that variant's assembly identity. CI builds this once
-    per variant, same as the bindings.
+    per variant.
   -->
   <PropertyGroup>
     <TargetFrameworks>$(FFmpegKitAndroidTargetFrameworks);$(FFmpegKitIosTargetFrameworks)</TargetFrameworks>
@@ -31,18 +36,6 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <!--
-      $(Version) is preferred - it reflects an explicit -p:Version=X override, e.g. a CI beta or
-      release build - but reading it here, mid-file, sees an empty value when no override was
-      passed: the SDK computes it from VersionPrefix/VersionSuffix in a target imported at the
-      very end of Sdk.targets, later in evaluation order than this PropertyGroup. The second line
-      recomputes the same fallback ourselves for that case.
-    -->
-    <FFmpegKitDependencyVersion Condition=" '$(FFmpegKitDependencyVersion)' == '' and '$(Version)' != '' ">$(Version)</FFmpegKitDependencyVersion>
-    <FFmpegKitDependencyVersion Condition=" '$(FFmpegKitDependencyVersion)' == '' ">$(VersionPrefix)$(VersionSuffix)</FFmpegKitDependencyVersion>
-  </PropertyGroup>
-
   <!--
     Platform code is picked per target framework rather than by the default glob, which would try
     to compile the Android half into the iOS assembly (and vice versa).
@@ -53,19 +46,18 @@
 
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
     <Compile Include="Platforms/Android/**/*.cs" />
-    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).Android" Version="[$(FFmpegKitDependencyVersion)]" />
+    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).Android" Version="[$(FFmpegKitAndroidPackageVersion)]" />
   </ItemGroup>
 
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
     <Compile Include="Platforms/iOS/**/*.cs" />
-    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).iOS" Version="[$(FFmpegKitDependencyVersion)]" />
+    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).iOS" Version="[$(FFmpegKitIosPackageVersion)]" />
   </ItemGroup>
 
   <!--
-    Licensing follows whichever binding this variant pulls in - both carry the same native
-    license for a given variant (GPL-3.0 for the -Gpl build types, LGPL-3.0 otherwise), and this
-    package embeds no native payload of its own. See FFmpegKit.Net.Android.csproj /
-    FFmpegKit.Net.iOS.csproj for the reasoning.
+    Licensing follows whichever external binding this variant pulls in - both carry the same
+    native license for a given variant (GPL-3.0 for the -Gpl build types, LGPL-3.0 otherwise), and
+    this package embeds no native payload of its own.
   -->
   <PropertyGroup>
     <FFmpegKitIsGpl>false</FFmpegKitIsGpl>

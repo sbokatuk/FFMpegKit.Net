@@ -9,14 +9,23 @@ namespace FFmpegKit.Net.PackageTests;
 /// </summary>
 /// <remarks>
 /// Scoped to the <c>Full</c> variant only - the repository builds all eight, but package-shape
-/// checks are identical in kind across variants (only the licence expression and native payload
-/// size differ, both of which are exercised here too), so exhaustively repeating them eight times
-/// over would mostly restate <see cref="IsGpl"/>. Set <c>FFMPEGKIT_ARTIFACTS</c> to point at a
-/// different <c>./artifacts</c> directory than the repository root's.
+/// checks are identical in kind across variants (only the licence expression differs, which is
+/// exercised here too), so exhaustively repeating them eight times over would mostly restate
+/// <see cref="IsGpl"/>. Set <c>FFMPEGKIT_ARTIFACTS</c> to point at a different <c>./artifacts</c>
+/// directory than the repository root's.
 /// </remarks>
 public static class Packages
 {
     public const string Variant = "Full";
+
+    /// <summary>
+    /// The exact external binding versions pinned in Directory.Build.props
+    /// (FFmpegKitAndroidPackageVersion / FFmpegKitIosPackageVersion). Kept here too so a pin bump
+    /// that forgets to update the other is caught by <see cref="CrossPlatformPackageTests"/>
+    /// rather than discovered at restore time by a consumer.
+    /// </summary>
+    public const string AndroidPackageVersion = "8.1.2.4";
+    public const string IosPackageVersion = "8.1.2.1";
 
     /// <summary>Target frameworks every variant-parameterized package must carry.</summary>
     public static readonly string[] AndroidTargetFrameworks =
@@ -29,37 +38,29 @@ public static class Packages
         "net8.0-ios18.0", "net9.0-ios18.0", "net10.0-ios26.0",
     ];
 
-    /// <summary>The xcframeworks the iOS binding ships: FFmpegKit's own plus the seven FFmpeg libraries.</summary>
-    public static readonly string[] ExpectedXcFrameworks =
-    [
-        "ffmpegkit", "libavcodec", "libavdevice", "libavfilter",
-        "libavformat", "libavutil", "libswresample", "libswscale",
-    ];
-
     public static bool IsGpl(string variant = Variant) => variant.EndsWith("Gpl", StringComparison.Ordinal);
 
     public static string NativeLicense(string variant = Variant) => IsGpl(variant) ? "GPL-3.0-only" : "LGPL-3.0-only";
 
     public static string LicenseExpression(string variant = Variant) => $"MIT AND {NativeLicense(variant)}";
 
+    /// <summary>
+    /// The external bindings this repository depends on but does not pack itself - published to
+    /// nuget.org from sbokatuk/FFmpegKit.Android and sbokatuk/FFmpegKit.iOS.
+    /// </summary>
     public static string AndroidPackageId => $"FFmpegKit.Net.{Variant}.Android";
     public static string IosPackageId => $"FFmpegKit.Net.{Variant}.iOS";
+
     public static string CrossPlatformPackageId => $"FFmpegKit.Net.{Variant}";
     public static string MauiPackageId => $"FFmpegKit.Net.{Variant}.Maui";
-
-    /// <summary>Identifies the simulator slice of an xcframework from its directory name.</summary>
-    public static bool IsSimulatorSlice(string slice) => slice.Contains("simulator", StringComparison.Ordinal);
-
-    /// <summary>Whether a slice directory name denotes an iOS slice at all.</summary>
-    public static bool IsIosSlice(string slice) => slice.StartsWith("ios-", StringComparison.Ordinal);
 
     public static string ArtifactsDirectory { get; } = ResolveArtifactsDirectory();
 
     public static string FindPackage(string packageId, string extension = ".nupkg")
     {
-        // "FFmpegKit.Net.Full.*" also matches "FFmpegKit.Net.Full.Android.<version>", since
-        // "Full" is a prefix of "Full.Android" - so the character right after "{packageId}."
-        // must start the version (a digit), not another id segment (a letter).
+        // "FFmpegKit.Net.Full.*" also matches "FFmpegKit.Net.Full.Maui.<version>", since "Full"
+        // is a prefix of "Full.Maui" - so the character right after "{packageId}." must start
+        // the version (a digit), not another id segment (a letter).
         var versionPattern = $"{Regex.Escape(packageId)}\\.\\d";
 
         var matches = Directory.Exists(ArtifactsDirectory)
@@ -90,29 +91,6 @@ public static class Packages
         return XDocument.Load(stream);
     }
 
-    /// <summary>Reads a package entry fully into memory so it can be seeked.</summary>
-    public static MemoryStream ReadEntry(ZipArchive package, string entryName)
-    {
-        var entry = package.GetEntry(entryName);
-        Assert.True(entry is not null, $"Package has no entry '{entryName}'.");
-
-        var buffer = new MemoryStream();
-        using (var stream = entry!.Open())
-        {
-            stream.CopyTo(buffer);
-        }
-
-        buffer.Position = 0;
-        return buffer;
-    }
-
-    /// <summary>
-    /// The iOS binding's native payload for a target framework - the xcframeworks, zipped into a
-    /// binding resource package that sits beside the assembly (CompressBindingResourcePackage).
-    /// </summary>
-    public static ZipArchive OpenNativePayload(ZipArchive package, string targetFramework) =>
-        new(ReadEntry(package, $"lib/{targetFramework}/{Packages.IosPackageId}.resources.zip"));
-
     /// <summary>Every dependency group's target framework, read from a package's nuspec.</summary>
     public static IEnumerable<string> DependencyGroupFrameworks(XDocument nuspec)
     {
@@ -131,6 +109,23 @@ public static class Packages
             .SelectMany(g => g.Elements(ns + "dependency"))
             .Select(d => d.Attribute("id")?.Value)
             .Where(id => id is not null)!;
+    }
+
+    /// <summary>
+    /// The pinned version of one dependency under a target framework group, or null if that
+    /// dependency is not declared there. The brackets ("[8.1.2.4]") NuGet writes for an exact
+    /// version pin are stripped, since the tests compare against the plain version string.
+    /// </summary>
+    public static string? DependencyVersion(XDocument nuspec, string targetFramework, string dependencyId)
+    {
+        var ns = nuspec.Root!.Name.Namespace;
+        var version = nuspec.Descendants(ns + "group")
+            .Where(g => g.Attribute("targetFramework")?.Value == targetFramework)
+            .SelectMany(g => g.Elements(ns + "dependency"))
+            .FirstOrDefault(d => d.Attribute("id")?.Value == dependencyId)
+            ?.Attribute("version")?.Value;
+
+        return version?.Trim('[', ']');
     }
 
     private static string ResolveArtifactsDirectory()
