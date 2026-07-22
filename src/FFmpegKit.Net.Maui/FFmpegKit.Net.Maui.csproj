@@ -1,0 +1,100 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    MAUI conveniences over FFmpegKit.Net: the app-builder wiring point and a helper for turning a
+    FilePicker/MediaPicker result into an FFmpeg-readable argument (see FFmpegKitMaui.cs).
+
+    Separate from FFmpegKit.Net on purpose. Everything here needs Microsoft.Maui.Controls, and
+    forcing that on a plain .NET for Android or .NET for iOS consumer just to run FFmpeg commands
+    would be a poor trade - unlike a WebRTC client, FFmpegKit needs no native view or Activity, so
+    this package is deliberately thin.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>$(FFmpegKitAndroidTargetFrameworks);$(FFmpegKitIosTargetFrameworks)</TargetFrameworks>
+
+    <AssemblyName>FFmpegKit.Net.$(FFmpegKitBuildType).Maui</AssemblyName>
+    <RootNamespace>Ffmpegkit.Net.Maui</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!--
+      UseMauiCore rather than UseMaui: this is a library of extension methods, not an app, and
+      the full UseMaui brings in app-only targets (resource generation, splash screens) that have
+      nothing to do here.
+    -->
+    <UseMauiCore>true</UseMauiCore>
+    <UseMauiEssentials>true</UseMauiEssentials>
+    <SingleProject>true</SingleProject>
+    <!--
+      MA002: since .NET 8, UseMauiCore/UseMauiEssentials no longer implicitly pull in their
+      NuGet packages. Both come in transitively through the Microsoft.Maui.Controls reference
+      below regardless, so this only silences a validation warning, not a real missing dependency.
+    -->
+    <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      $(Version) is preferred - it reflects an explicit -p:Version=X override, e.g. a CI beta or
+      release build - but reading it here, mid-file, sees an empty value when no override was
+      passed: the SDK computes it from VersionPrefix/VersionSuffix in a target imported at the
+      very end of Sdk.targets, later in evaluation order than this PropertyGroup. The second line
+      recomputes the same fallback ourselves for that case.
+    -->
+    <FFmpegKitDependencyVersion Condition=" '$(FFmpegKitDependencyVersion)' == '' and '$(Version)' != '' ">$(Version)</FFmpegKitDependencyVersion>
+    <FFmpegKitDependencyVersion Condition=" '$(FFmpegKitDependencyVersion)' == '' ">$(VersionPrefix)$(VersionSuffix)</FFmpegKitDependencyVersion>
+  </PropertyGroup>
+
+  <!-- Platform code is selected per target framework rather than by the default glob. -->
+  <ItemGroup>
+    <Compile Remove="Platforms/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <Compile Include="Platforms/Android/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <Compile Include="Platforms/iOS/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType)" Version="[$(FFmpegKitDependencyVersion)]" />
+  </ItemGroup>
+
+  <!--
+    Licensing follows FFmpegKit.Net.$(FFmpegKitBuildType), which this package pulls in - see
+    FFmpegKit.Net.csproj for the reasoning; this one embeds no native payload of its own either.
+  -->
+  <PropertyGroup>
+    <FFmpegKitIsGpl>false</FFmpegKitIsGpl>
+    <FFmpegKitIsGpl Condition="$(FFmpegKitBuildType.EndsWith('Gpl'))">true</FFmpegKitIsGpl>
+
+    <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' == 'true' ">GPL-3.0-only</FFmpegKitNativeLicense>
+    <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' != 'true' ">LGPL-3.0-only</FFmpegKitNativeLicense>
+
+    <FFmpegKitVariantName>$(FFmpegKitBuildType.ToLowerInvariant().Replace('gpl', '-gpl'))</FFmpegKitVariantName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>FFmpegKit.Net.$(FFmpegKitBuildType).Maui</PackageId>
+    <Title>.NET MAUI helpers for FFmpegKit.Net.$(FFmpegKitBuildType).</Title>
+    <Description>Adds the app-builder wiring point and a FilePicker/MediaPicker helper a .NET MAUI app needs to use FFmpegKit.Net.$(FFmpegKitBuildType) comfortably. Add FFmpegKit.Net.$(FFmpegKitBuildType) on its own if you are not using MAUI.</Description>
+    <PackageLicenseExpression>MIT AND $(FFmpegKitNativeLicense)</PackageLicenseExpression>
+    <PackageTags>ffmpeg;ffmpegkit;$(FFmpegKitVariantName);video;audio;transcode;SDK;MAUI;Android;iOS</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../build/icon.png" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+
+</Project>

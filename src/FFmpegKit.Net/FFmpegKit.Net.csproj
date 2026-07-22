@@ -1,0 +1,98 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The cross-platform API: one FFmpegKit.Execute/ExecuteAsync surface shared by Android and iOS,
+    instead of every consumer writing the adapter between Ffmpegkit.Droid and Ffmpegkit.Ios by
+    hand. See FFmpegKit.cs, FFprobeKit.cs and FFmpegKitConfig.cs for what it covers, and the
+    Platforms/Android and Platforms/iOS folders for the two implementations.
+
+    Deliberately no MAUI dependency, so plain .NET for Android and .NET for iOS apps can use this.
+    The MAUI-specific glue lives in FFmpegKit.Net.Maui.
+
+    Both platforms' target frameworks are listed together, which is why this can only be packed on
+    macOS - restoring the iOS legs needs the iOS workload. See build/BuildNugets.sh.
+
+    Parameterized by FFmpegKitBuildType like the two bindings: Ffmpegkit.Ios.FFmpegKit and
+    Ffmpegkit.Droid.FFmpegKit are identical across variants, but each variant is a distinct
+    assembly (FFmpegKit.Net.Video.iOS vs FFmpegKit.Net.Full.iOS, ...), so a cross-platform
+    assembly built against one is bound to that variant's assembly identity. CI builds this once
+    per variant, same as the bindings.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>$(FFmpegKitAndroidTargetFrameworks);$(FFmpegKitIosTargetFrameworks)</TargetFrameworks>
+
+    <AssemblyName>FFmpegKit.Net.$(FFmpegKitBuildType)</AssemblyName>
+    <RootNamespace>Ffmpegkit.Net</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: a handful of internal conversion helpers are exposed as internal, not private, and warn without a doc comment. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      $(Version) is preferred - it reflects an explicit -p:Version=X override, e.g. a CI beta or
+      release build - but reading it here, mid-file, sees an empty value when no override was
+      passed: the SDK computes it from VersionPrefix/VersionSuffix in a target imported at the
+      very end of Sdk.targets, later in evaluation order than this PropertyGroup. The second line
+      recomputes the same fallback ourselves for that case.
+    -->
+    <FFmpegKitDependencyVersion Condition=" '$(FFmpegKitDependencyVersion)' == '' and '$(Version)' != '' ">$(Version)</FFmpegKitDependencyVersion>
+    <FFmpegKitDependencyVersion Condition=" '$(FFmpegKitDependencyVersion)' == '' ">$(VersionPrefix)$(VersionSuffix)</FFmpegKitDependencyVersion>
+  </PropertyGroup>
+
+  <!--
+    Platform code is picked per target framework rather than by the default glob, which would try
+    to compile the Android half into the iOS assembly (and vice versa).
+  -->
+  <ItemGroup>
+    <Compile Remove="Platforms/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <Compile Include="Platforms/Android/**/*.cs" />
+    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).Android" Version="[$(FFmpegKitDependencyVersion)]" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <Compile Include="Platforms/iOS/**/*.cs" />
+    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).iOS" Version="[$(FFmpegKitDependencyVersion)]" />
+  </ItemGroup>
+
+  <!--
+    Licensing follows whichever binding this variant pulls in - both carry the same native
+    license for a given variant (GPL-3.0 for the -Gpl build types, LGPL-3.0 otherwise), and this
+    package embeds no native payload of its own. See FFmpegKit.Net.Android.csproj /
+    FFmpegKit.Net.iOS.csproj for the reasoning.
+  -->
+  <PropertyGroup>
+    <FFmpegKitIsGpl>false</FFmpegKitIsGpl>
+    <FFmpegKitIsGpl Condition="$(FFmpegKitBuildType.EndsWith('Gpl'))">true</FFmpegKitIsGpl>
+
+    <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' == 'true' ">GPL-3.0-only</FFmpegKitNativeLicense>
+    <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' != 'true' ">LGPL-3.0-only</FFmpegKitNativeLicense>
+
+    <FFmpegKitVariantName>$(FFmpegKitBuildType.ToLowerInvariant().Replace('gpl', '-gpl'))</FFmpegKitVariantName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>FFmpegKit.Net.$(FFmpegKitBuildType)</PackageId>
+    <Title>Cross-platform .NET client for the native FFmpegKit $(FFmpegKitBuildType) SDK.</Title>
+    <Description>One API over the FFmpegKit bindings for Android and iOS: run FFmpeg/FFprobe commands with awaitable calls, typed media information and progress reporting, instead of writing a per-platform adapter over Ffmpegkit.Droid and Ffmpegkit.Ios by hand. Pulls in the platform binding that matches whichever target framework you build. For .NET MAUI apps, FFmpegKit.Net.Maui adds the app-builder wiring.</Description>
+    <PackageLicenseExpression>MIT AND $(FFmpegKitNativeLicense)</PackageLicenseExpression>
+    <PackageTags>ffmpeg;ffmpegkit;$(FFmpegKitVariantName);video;audio;transcode;SDK;MAUI;Android;iOS;Binding</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../build/icon.png" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+
+</Project>

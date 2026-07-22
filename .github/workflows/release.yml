@@ -1,0 +1,183 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: resolve release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      android-native-version: ${{ steps.resolve.outputs.android-native-version }}
+      ios-native-version: ${{ steps.resolve.outputs.ios-native-version }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: resolve
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! printf '%s' "${version}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::tag '${GITHUB_REF_NAME}' does not look like a version (expected e.g. v8.1.2.4)"
+            exit 1
+          fi
+
+          # Tags name the FFmpeg version, not either binding's own native release number:
+          # v8.1.2.4 is FFmpeg 8.1.2, binding revision 4. The fourth component and any prerelease
+          # suffix are dropped to get the FFmpeg version.
+          ffmpeg_version=$(printf '%s' "${version%%-*}" | cut -d. -f1-3)
+
+          # iOS: ffmpeg_kit_flutter tags its releases with the FFmpeg version directly - no lookup.
+          echo "ios-native-version=${ffmpeg_version}" >> "$GITHUB_OUTPUT"
+
+          # Android: the FFmpegKit release that packages this FFmpeg version is looked up from
+          # build/native-versions.tsv, since the two numbering schemes do not track each other -
+          # FFmpegKit 8.1.7 packages FFmpeg n8.1.2.
+          android_native=$(awk -F'\t' -v v="${ffmpeg_version}" '$1 == v { print $2 }' build/native-versions.tsv)
+          if [ -z "${android_native}" ]; then
+            echo "::error::FFmpeg ${ffmpeg_version} is not in build/native-versions.tsv - known builds:"
+            grep -v '^#' build/native-versions.tsv >&2
+            exit 1
+          fi
+          echo "android-native-version=${android_native}" >> "$GITHUB_OUTPUT"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "FFmpeg ${ffmpeg_version} (Android FFmpegKit ${android_native}, iOS ${ffmpeg_version})" >> "$GITHUB_STEP_SUMMARY"
+
+          case "${version}" in
+            *-*) prerelease=true ;;
+            *)   prerelease=false ;;
+          esac
+          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${version} (prerelease=${prerelease})" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: build
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      android-native-version: ${{ needs.version.outputs.android-native-version }}
+      ios-native-version: ${{ needs.version.outputs.ios-native-version }}
+
+  publish:
+    name: publish to nuget.org and create release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    # Must match the Environment on the nuget.org trusted publishing policy for this workflow.
+    environment: nuget.org
+    permissions:
+      # contents: write creates the GitHub release; id-token: write lets the job request the OIDC
+      # token that nuget.org exchanges for a short-lived API key.
+      contents: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed to find the previous tag when generating the changelog
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nuget-packages-*
+          path: artifacts
+          merge-multiple: true
+
+      # nuget.org is published to first: a GitHub release that links to packages which failed to
+      # upload would be worse than a release that is created a moment late.
+      - name: Authenticate to nuget.org
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to nuget.org
+        run: |
+          dotnet nuget push "artifacts/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --skip-duplicate
+
+      - name: Compose release notes
+        run: |
+          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+
+          # A curated docs/release-notes/<version>.md replaces the generated commit list when one
+          # exists.
+          notes="docs/release-notes/${VERSION}.md"
+          [ -f "${notes}" ] || notes="docs/release-notes/${VERSION%%-*}.md"
+
+          {
+            if [ -f "${notes}" ]; then
+              echo "==> using curated notes from ${notes}" >&2
+              cat "${notes}"
+            else
+              echo "## What's changed"
+              echo
+              if [ -n "${previous}" ]; then
+                git log --no-merges --pretty='- %s (%h)' "${previous}..${GITHUB_REF_NAME}"
+              else
+                echo "Initial release."
+              fi
+            fi
+            echo
+            if [ -n "${previous}" ]; then
+              echo "**Full changelog**: ${{ github.server_url }}/${{ github.repository }}/compare/${previous}...${GITHUB_REF_NAME}"
+              echo
+            fi
+
+            echo "## Packages"
+            echo
+            echo "Every variant below ships as \`.Android\`, \`.iOS\`, a cross-platform package"
+            echo "with no suffix, and \`.Maui\` - see the root README for what each is."
+            echo
+            echo "| Variant | License |"
+            echo "| --- | --- |"
+            for variant in Audio Full FullGpl Https HttpsGpl Min MinGpl Video; do
+              case "${variant}" in
+                *Gpl) license="MIT AND GPL-3.0-only" ;;
+                *)    license="MIT AND LGPL-3.0-only" ;;
+              esac
+              echo "| \`${variant}\` | \`${license}\` |"
+            done
+            echo
+            echo "\`\`\`"
+            echo "dotnet add package FFmpegKit.Net.Full.Maui --version ${VERSION}"
+            echo "\`\`\`"
+            echo
+            echo "## Licensing"
+            echo
+            echo "The binding and client code is MIT, but the bundled native FFmpeg binaries are"
+            echo "not. The \`-Gpl\` variants enable x264/x265/xvid/vidstab and are **GPL-3.0**; the"
+            echo "rest are LGPL-3.0. If your app is closed-source, use a non-GPL variant. Each"
+            echo "package ships the applicable texts under \`licenses/\`."
+          } > release-notes.md
+
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The packages themselves are not attached: nuget.org is the distribution channel, and
+          # the notes link there instead.
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${VERSION}" \
+            --notes-file release-notes.md \
+            ${{ needs.version.outputs.prerelease == 'true' && '--prerelease' || '' }}

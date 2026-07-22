@@ -60,7 +60,10 @@ BenchmarkDotNet.Artifacts/
 # .NET Core
 project.lock.json
 project.fragment.lock.json
-artifacts/
+# Contents only, not the directory itself: NuGet.config exposes artifacts/ as a package
+# source, and git cannot un-ignore a file inside a directory it has already ignored.
+artifacts/*
+!artifacts/.gitkeep
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
@@ -396,3 +399,17 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# FFmpegKit.Net
+# Native payloads dropped into the binding projects by the fetch scripts - reproducible from the
+# native version pins in Directory.Build.props via src/FFmpegKit.Net.Android/Jars/FetchJars.sh
+# and build/FetchXcFrameworks.sh. Too large to commit, and not tied to a single revision anyway.
+src/FFmpegKit.Net.Android/Jars/*.aar
+src/FFmpegKit.Net.Android/Jars/*.jar
+src/FFmpegKit.Net.iOS/libs/
+
+# Device/simulator test output
+device-tests-logcat.txt
+device-tests-simulator.log
+
+.DS_Store

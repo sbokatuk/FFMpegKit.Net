@@ -1,0 +1,133 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      Target frameworks and the SDK band come from the root Directory.Build.props, which both
+      this project and FFmpegKit.Net.iOS read FFmpegKitSdkBand from - see the comment there for
+      why no single .NET SDK can build net8, net9 and net10 together.
+    -->
+    <TargetFrameworks>$(FFmpegKitAndroidTargetFrameworks)</TargetFrameworks>
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+
+    <!--
+      The namespace stays Ffmpegkit.Droid even though the package is FFmpegKit.Net.*. A namespace
+      rooted at "FFmpegKit" containing a type also called FFmpegKit makes every consumer call
+      ambiguous - `FFmpegKit.Execute(...)` resolves the namespace first and fails with
+      "'Execute' does not exist in the namespace 'FFmpegKit'". Renaming it is a breaking source
+      change that would buy nothing.
+    -->
+    <RootNamespace>Ffmpegkit.Droid</RootNamespace>
+    <AssemblyName>FFmpegKit.Net.$(FFmpegKitBuildType).Android</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AndroidClassParser>class-parse</AndroidClassParser>
+    <AndroidCodegenTarget>XAJavaInterop1</AndroidCodegenTarget>
+    <!--
+      CS1591: the generated binding has no XML doc comments.
+      BG8401: AbstractSession exposes protected backing fields (createTime, returnCode, state, ...)
+        whose managed names collide with the properties generated from their getters, so the
+        generator skips the field and warns - 88 warnings per build. Removing the fields via
+        Transforms/Metadata.xml instead produces byte-identical generated code and simply trades
+        these for the same number of BG8A00 "matched no nodes" warnings, so the warning is
+        suppressed here rather than worked around.
+    -->
+    <NoWarn>$(NoWarn);CS1591;BG8401</NoWarn>
+  </PropertyGroup>
+
+  <Target Name="ValidateFFmpegKitSdkBand" BeforeTargets="Build;Pack"
+          Condition=" '$(TargetFrameworks)' == '' ">
+    <Error Text="FFmpegKitSdkBand must be 'net9' or 'net10', but was '$(FFmpegKitSdkBand)'." />
+  </Target>
+
+  <!--
+    Map the build type onto the published .aar artifact name:
+    FullGpl -> full-gpl, HttpsGpl -> https-gpl, MinGpl -> min-gpl, Video -> video, ...
+  -->
+  <PropertyGroup>
+    <FFmpegKitAarName>$(FFmpegKitBuildType.ToLowerInvariant().Replace('gpl', '-gpl'))</FFmpegKitAarName>
+    <FFmpegKitAar>Jars/ffmpeg-kit-$(FFmpegKitAarName)-$(FFmpegKitAndroidNativeVersion).aar</FFmpegKitAar>
+  </PropertyGroup>
+
+  <Target Name="ValidateFFmpegKitAar" BeforeTargets="Build;Pack"
+          Condition="!Exists('$(MSBuildProjectDirectory)/$(FFmpegKitAar)')">
+    <Error Text="$(FFmpegKitAar) is missing. Run ./Jars/FetchJars.sh $(FFmpegKitAndroidNativeVersion) first." />
+  </Target>
+
+  <!--
+    Licensing follows the native binaries, not this repository. Upstream ships the -gpl variants
+    under GPL-3.0 (x264/x265/xvid/vidstab are GPL) and everything else under LGPL-3.0; each .aar
+    carries the matching licence text at res/raw/license.txt. Upstream states version 3.0 with no
+    "or later" wording, hence the -only SPDX identifiers. The binding source itself is MIT, so the
+    package as a whole is the conjunction of the two.
+  -->
+  <PropertyGroup>
+    <FFmpegKitIsGpl>false</FFmpegKitIsGpl>
+    <FFmpegKitIsGpl Condition="$(FFmpegKitBuildType.EndsWith('Gpl'))">true</FFmpegKitIsGpl>
+
+    <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' == 'true' ">GPL-3.0-only</FFmpegKitNativeLicense>
+    <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' != 'true' ">LGPL-3.0-only</FFmpegKitNativeLicense>
+
+    <FFmpegKitNativeLicenseFile Condition=" '$(FFmpegKitIsGpl)' == 'true' ">../../licenses/GPL-3.0.txt</FFmpegKitNativeLicenseFile>
+    <FFmpegKitNativeLicenseFile Condition=" '$(FFmpegKitIsGpl)' != 'true' ">../../licenses/LGPL-3.0.txt</FFmpegKitNativeLicenseFile>
+  </PropertyGroup>
+
+  <!--
+    Jars/ holds every variant once FetchJars.sh has run, so clear any default globbing and
+    bind only the one .aar this build is for.
+  -->
+  <ItemGroup>
+    <AndroidLibrary Remove="Jars/**/*.aar" />
+    <AndroidLibrary Remove="Jars/**/*.jar" />
+    <AndroidLibrary Include="$(FFmpegKitAar)" Bind="true" />
+
+    <!--
+      FFmpegKitConfig's static initialiser calls com.arthenica.smartexception.java.Exceptions.
+      That dependency is neither bundled in the .aar nor declared in its .pom, so it has to be
+      embedded here or every FFmpeg call throws NoClassDefFoundError on device. Bind="false":
+      consumers only need the classes at runtime, not a C# binding for them.
+    -->
+    <AndroidLibrary Include="Jars/smart-exception-common-0.2.1.jar" Bind="false" />
+    <AndroidLibrary Include="Jars/smart-exception-java-0.2.1.jar" Bind="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <TransformFile Include="Transforms/Metadata.xml" />
+    <TransformFile Include="Transforms/EnumFields.xml" />
+    <TransformFile Include="Transforms/EnumMethods.xml" />
+  </ItemGroup>
+
+  <!-- Packaging -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>FFmpegKit.Net.$(FFmpegKitBuildType).Android</PackageId>
+    <Title>.NET for Android bindings for the native FFmpegKit $(FFmpegKitBuildType) SDK.</Title>
+    <Description>.NET for Android / .NET MAUI bindings for the native FFmpegKit $(FFmpegKitBuildType) SDK. Contains FFmpeg $(FFmpegVersion), from FFmpegKit release $(FFmpegKitAndroidNativeVersion). The bundled native FFmpeg binaries are licensed under $(FFmpegKitNativeLicense); the binding code is MIT. See the licence files in this package before shipping. For a single API shared with the iOS binding, see FFmpegKit.Net.$(FFmpegKitBuildType) instead.</Description>
+    <PackageLicenseExpression>MIT AND $(FFmpegKitNativeLicense)</PackageLicenseExpression>
+    <PackageTags>ffmpeg;ffmpegkit;$(FFmpegKitAarName);video;audio;transcode;SDK;MAUI;Android;dotnet-android;Binding</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="icon.png" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" Visible="false" />
+
+    <!--
+      Ship both licence texts the package is covered by. Distributing LGPL/GPL binaries means
+      conveying their terms, and a consumer should not have to unzip the .aar to find them.
+      Packed into a folder so each file keeps its own name - naming the target explicitly would
+      make NuGet treat the extensionless LICENSE as a directory.
+    -->
+    <None Include="../../LICENSE" Pack="true" PackagePath="licenses/" Visible="false" />
+    <None Include="$(FFmpegKitNativeLicenseFile)" Pack="true" PackagePath="licenses/" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Jars/AboutJars.txt" />
+    <None Include="Additions/AboutAdditions.txt" />
+  </ItemGroup>
+
+</Project>

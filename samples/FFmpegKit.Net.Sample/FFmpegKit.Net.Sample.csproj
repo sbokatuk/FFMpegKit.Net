@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      Both platforms the .NET 9 SDK band can build in one go, so the sample proves
+      FFmpegKit.Net.Full.Maui resolves and runs the same code on Android and iOS - which is the
+      entire point of the cross-platform layer. net10.0-* is deliberately left out: it would mean
+      a second SDK and workload set to compile a sample that exercises the same API the device
+      tests already run against net10 for.
+    -->
+    <TargetFrameworks>net9.0-android35.0;net9.0-ios18.0</TargetFrameworks>
+
+    <OutputType>Exe</OutputType>
+    <RootNamespace>FFmpegKit.Net.Sample</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <CheckEolWorkloads>false</CheckEolWorkloads>
+
+    <ApplicationTitle>FFmpegKit.Net.Sample</ApplicationTitle>
+    <ApplicationId>net.ffmpegkit.sample</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+
+    <!--
+      FFmpegKit's native Android payload requires minSdkVersion 24, but this sample previews the
+      result with CommunityToolkit's MediaElement, which requires 26. The sample therefore takes
+      the higher floor; a consuming app that does not use MediaElement can still target 24.
+      12.2 is the floor the .NET 9 iOS SDK enforces.
+    -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.2</SupportedOSPlatformVersion>
+
+    <!--
+      Which build of the FFmpegKit packages to demo. Defaults to FFmpegVersion from
+      Directory.Build.props, so it tracks the repository automatically; pass
+      -p:FFmpegKitVersion=8.1.2-beta.4 to try a specific build.
+    -->
+    <FFmpegKitVersion Condition=" '$(FFmpegKitVersion)' == '' ">$(FFmpegVersion)</FFmpegKitVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+    <MauiImage Include="Resources\Images\*" />
+    <MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
+    <MauiFont Include="Resources\Fonts\*" />
+    <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Microsoft.Maui.Controls pinned above the workload's own bundled 9.0.0: both UseMaui=true's
+      implicit reference and an explicit $(MauiVersion) one resolve to exactly that version, which
+      is older than what CommunityToolkit.Maui 11 requires (NU1605 package downgrade error).
+      Controls itself is an ordinary NuGet package independent of which workload pack version is
+      installed, so pinning it higher here restores cleanly without reinstalling the workload.
+    -->
+    <PackageReference Include="CommunityToolkit.Maui" Version="11.0.0" />
+    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="6.0.1" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.30" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+
+    <!--
+      The locally built package, resolved from ./artifacts via the local-artifacts source in the
+      repository's NuGet.config. Run build/BuildNugets.sh first - this deliberately does not come
+      from nuget.org, so the example exercises what you just built.
+
+      Full.Maui (LGPL) is referenced deliberately - swapping to a -Gpl variant would make the
+      sample itself GPL-3.0. This one package is enough for both platforms: it depends on
+      FFmpegKit.Net.Full, which in turn resolves FFmpegKit.Net.Full.Android or
+      FFmpegKit.Net.Full.iOS per target framework.
+    -->
+    <PackageReference Include="FFmpegKit.Net.Full.Maui" Version="$(FFmpegKitVersion)" />
+  </ItemGroup>
+
+</Project>

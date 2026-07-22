@@ -1,0 +1,233 @@
+name: build
+
+# Reusable pipeline: builds every FFmpegKit.Net package (both bindings, the cross-platform client
+# and the MAUI package) at a given version, for all eight variants, validates the packed packages,
+# and uploads them as an artifact. Callers (pr.yml, release.yml) decide the version and what to do
+# with the result.
+#
+# Split across two runners because iOS needs Xcode and Android needs only a JDK and the Android
+# SDK: pack-android packs on ubuntu-latest, pack-apple - which also builds the cross-platform
+# client and the MAUI package, since both multi-target Android and iOS together - packs on
+# macos-latest and depends on pack-android's output being in ./artifacts first (see
+# build/BuildNugets.sh's own note on why).
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: NuGet version to stamp on every package.
+        required: true
+        type: string
+      android-native-version:
+        description: >
+          FFmpegKit Android release to bind against. Defaults to FFmpegKitAndroidNativeVersion in
+          Directory.Build.props; set it to build an older line, e.g. 6.0.3.
+        required: false
+        default: ''
+        type: string
+      ios-native-version:
+        description: >
+          FFmpegKit iOS (ffmpeg_kit_flutter) release to bind against. Defaults to
+          FFmpegKitIosNativeVersion in Directory.Build.props.
+        required: false
+        default: ''
+        type: string
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  pack-android:
+    name: pack (android)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # 9.0.x packs net8+net9 (global.json pins it) and 10.0.x packs net10. 8.0.x is installed
+          # only so its Android workload band is available - see the workload step below.
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Install Android workloads for every SDK band
+        run: |
+          # Each band supplies a different reference pack: net8.0-android34.0 needs
+          # Microsoft.Android.Ref.34 from the .NET 8 band, net9.0-android35.0 needs Ref.35 from
+          # the .NET 9 band, net10.0-android36.0 needs Ref.36 from the .NET 10 band. The SDK is
+          # chosen by the global.json in the working directory, so each is installed from a
+          # scratch directory pinned to that SDK.
+          for major in 8 9 10; do
+            dir="${RUNNER_TEMP}/sdk${major}"
+            mkdir -p "${dir}"
+            sdk=$(dotnet --list-sdks | grep "^${major}\." | tail -1 | cut -d' ' -f1)
+            ( cd "${dir}" \
+              && dotnet new globaljson --sdk-version "${sdk}" --force \
+              && dotnet workload install android )
+          done
+
+      - name: Set up Android SDK platforms
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 platforms;android-35 platforms;android-36'
+
+      - name: Resolve native version
+        id: native
+        run: |
+          version="${{ inputs.android-native-version }}"
+          if [ -z "${version}" ]; then
+            version=$(grep -oPm1 '(?<=<FFmpegKitAndroidNativeVersion>)[^<]+' Directory.Build.props)
+          fi
+          if [ -z "${version}" ]; then
+            echo "::error::could not determine the Android FFmpegKit native version"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache FFmpegKit binaries
+        id: jars
+        uses: actions/cache@v4
+        with:
+          path: src/FFmpegKit.Net.Android/Jars
+          key: ffmpegkit-jars-${{ steps.native.outputs.version }}-${{ hashFiles('src/FFmpegKit.Net.Android/Jars/FetchJars.sh') }}
+
+      - name: Fetch FFmpegKit binaries
+        if: steps.jars.outputs.cache-hit != 'true'
+        run: ./src/FFmpegKit.Net.Android/Jars/FetchJars.sh "${{ steps.native.outputs.version }}"
+
+      - name: Pack the Android binding, all variants
+        run: ./build/BuildNugets.sh "${{ inputs.version }}" android "${{ steps.native.outputs.version }}"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-android
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  pack-apple:
+    name: pack (ios, cross-platform, maui)
+    needs: pack-android
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the Android packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages-android
+          path: artifacts
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Install iOS/MAUI workloads for every SDK band
+        run: |
+          for major in 9 10; do
+            dir="${RUNNER_TEMP}/sdk${major}"
+            mkdir -p "${dir}"
+            sdk=$(dotnet --list-sdks | grep "^${major}\." | tail -1 | cut -d' ' -f1)
+            ( cd "${dir}" \
+              && dotnet new globaljson --sdk-version "${sdk}" --force \
+              && dotnet workload install ios maui-ios )
+          done
+
+      - name: Resolve native version
+        id: native
+        run: |
+          version="${{ inputs.ios-native-version }}"
+          if [ -z "${version}" ]; then
+            version=$(grep -oPm1 '(?<=<FFmpegKitIosNativeVersion>)[^<]+' Directory.Build.props)
+          fi
+          if [ -z "${version}" ]; then
+            echo "::error::could not determine the iOS FFmpegKit native version"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache FFmpegKit xcframeworks
+        id: xcframeworks
+        uses: actions/cache@v4
+        with:
+          path: src/FFmpegKit.Net.iOS/libs
+          key: ffmpegkit-xcframeworks-${{ steps.native.outputs.version }}-${{ hashFiles('build/FetchXcFrameworks.sh') }}
+
+      - name: Fetch FFmpegKit xcframeworks
+        if: steps.xcframeworks.outputs.cache-hit != 'true'
+        run: ./build/FetchXcFrameworks.sh "${{ steps.native.outputs.version }}"
+
+      - name: Pack the iOS binding, cross-platform client and MAUI package, all variants
+        run: ./build/BuildNugets.sh "${{ inputs.version }}" apple "" "${{ steps.native.outputs.version }}"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-apple
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  validate:
+    name: validate packages
+    needs: [pack-android, pack-apple]
+    # macOS, not ubuntu: building the sample needs the iOS workload, since
+    # FFmpegKit.Net.Sample multi-targets Android and iOS in the same project.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nuget-packages-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install Android/iOS/MAUI workloads
+        run: dotnet workload install android ios maui
+
+      - name: Set up Android SDK platforms
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35'
+
+      - name: Run package tests
+        run: dotnet test tests/FFmpegKit.Net.PackageTests --logger 'trx;LogFileName=package-tests.trx'
+
+      # The sample consumes FFmpegKit.Net.Full.Maui through a PackageReference exactly as a user
+      # would, so it is what catches an API that no longer matches what the README documents -
+      # nothing else here builds against the packed packages the way an actual consumer does.
+      # Build only, both target frameworks: proving it links is the point, not running it.
+      - name: Build the sample against the packed packages
+        run: |
+          dotnet build samples/FFmpegKit.Net.Sample/FFmpegKit.Net.Sample.csproj \
+            --configuration Release \
+            -p:FFmpegKitVersion="${{ inputs.version }}"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-test-results
+          path: '**/*.trx'
+          if-no-files-found: ignore
+          retention-days: 7
