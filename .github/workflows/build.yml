@@ -87,6 +87,13 @@ jobs:
               && dotnet workload install android ios maui-ios )
           done
 
+      # The workload provides the .NET tooling, not the Android SDK platforms it compiles
+      # against - without these the build stops at XA5207 (no android.jar for the API level).
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 platforms;android-35 platforms;android-36'
+
       - name: Resolve external binding pins
         id: pins
         run: |
@@ -140,6 +147,12 @@ jobs:
 
       - name: Install Android/iOS/MAUI workloads
         run: dotnet workload install android ios maui
+
+      # For the sample build below - the workload alone stops at XA5207 without the platform.
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35'
 
       - name: Run unit tests
         run: dotnet test tests/FFmpegKit.Net.UnitTests --logger 'trx;LogFileName=unit-tests.trx'
