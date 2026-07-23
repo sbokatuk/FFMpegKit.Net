@@ -51,15 +51,27 @@ printf '{ "sdk": { "version": "%s", "rollForward": "latestFeature" } }\n' "${sdk
 package_id="ffmpegkit.net.$(printf '%s' "${VARIANT}" | tr '[:upper:]' '[:lower:]')"
 rm -rf "${HOME}/.nuget/packages/${package_id}/${VERSION}"
 
+# The app's own intermediate output has to go too, not just the NuGet cache: the platform
+# binding's native payload is extracted into obj/ and copied into the .app, and neither step
+# re-runs when the package version string is unchanged.
+rm -rf "${REPO_ROOT}/tests/FFmpegKit.Net.DeviceTests/obj" \
+       "${REPO_ROOT}/tests/FFmpegKit.Net.DeviceTests/bin"
+
 echo "==> building device tests (variant=${VARIANT}, version=${VERSION}, tfm=${TARGET_FRAMEWORK}, sdk=${sdk_version})"
+# Debug, not Release. A Release simulator build AOT-compiles every assembly in the app - several
+# hundred BCL assemblies plus ~100 MB of statically linked FFmpeg through the trimmer - which
+# runs 20+ minutes on a CI runner before the first check executes. Nothing is lost: this suite
+# verifies that the packed package resolves the right binding and that the cross-platform API
+# drives real FFmpeg - none of which AOT affects. The sample build covers a consumer-shaped
+# compile against the same packages.
 ( cd "${SDK_DIR}" && dotnet build "${PROJECT}" \
-    --configuration Release \
+    --configuration Debug \
     -p:FFmpegKitVariant="${VARIANT}" \
     -p:FFmpegKitPackageVersion="${VERSION}" \
     -p:FFmpegKitDeviceTargetFramework="${TARGET_FRAMEWORK}" \
     -p:RuntimeIdentifier="${SIMULATOR_RID}" )
 
-APP_PATH="$(find "${REPO_ROOT}/tests/FFmpegKit.Net.DeviceTests/bin/Release/${TARGET_FRAMEWORK}/${SIMULATOR_RID}" \
+APP_PATH="$(find "${REPO_ROOT}/tests/FFmpegKit.Net.DeviceTests/bin/Debug/${TARGET_FRAMEWORK}/${SIMULATOR_RID}" \
     -maxdepth 1 -name '*.app' -print -quit)"
 if [ -z "${APP_PATH}" ]; then
     echo "::error::no .app bundle was produced"
