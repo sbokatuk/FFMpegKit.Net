@@ -143,6 +143,4 @@ FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8
 
 Everything packs on macOS: both packages multi-target Android and iOS together, so restoring
 either needs the iOS workload regardless of which platform's code is being exercised - there is no
-Android-only, Linux-runner leg the way there is in the two binding repositories. Publishing (when
-configured) should use nuget.org [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
-rather than a long-lived API key, exactly as both binding repositories already do.
+Android-only, Linux-runner leg the way there is in the two binding repositories.

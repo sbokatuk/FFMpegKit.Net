@@ -90,13 +90,14 @@ jobs:
       - name: Resolve external binding pins
         id: pins
         run: |
+          # sed, not grep -P: this job runs on macOS, whose BSD grep has no -P.
           android="${{ inputs.android-package-version }}"
           if [ -z "${android}" ]; then
-            android=$(grep -oPm1 '(?<=<FFmpegKitAndroidPackageVersion>)[^<]+' Directory.Build.props)
+            android=$(sed -n 's:.*<FFmpegKitAndroidPackageVersion>\(.*\)</FFmpegKitAndroidPackageVersion>.*:\1:p' Directory.Build.props | head -1)
           fi
           ios="${{ inputs.ios-package-version }}"
           if [ -z "${ios}" ]; then
-            ios=$(grep -oPm1 '(?<=<FFmpegKitIosPackageVersion>)[^<]+' Directory.Build.props)
+            ios=$(sed -n 's:.*<FFmpegKitIosPackageVersion>\(.*\)</FFmpegKitIosPackageVersion>.*:\1:p' Directory.Build.props | head -1)
           fi
           if [ -z "${android}" ] || [ -z "${ios}" ]; then
             echo "::error::could not determine the Android/iOS binding pins"

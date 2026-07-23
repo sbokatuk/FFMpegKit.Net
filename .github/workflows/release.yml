@@ -102,8 +102,8 @@ jobs:
           notes="docs/release-notes/${VERSION}.md"
           [ -f "${notes}" ] || notes="docs/release-notes/${VERSION%%-*}.md"
 
-          android_pin=$(grep -oPm1 '(?<=<FFmpegKitAndroidPackageVersion>)[^<]+' Directory.Build.props)
-          ios_pin=$(grep -oPm1 '(?<=<FFmpegKitIosPackageVersion>)[^<]+' Directory.Build.props)
+          android_pin=$(sed -n 's:.*<FFmpegKitAndroidPackageVersion>\(.*\)</FFmpegKitAndroidPackageVersion>.*:\1:p' Directory.Build.props | head -1)
+          ios_pin=$(sed -n 's:.*<FFmpegKitIosPackageVersion>\(.*\)</FFmpegKitIosPackageVersion>.*:\1:p' Directory.Build.props | head -1)
 
           {
             if [ -f "${notes}" ]; then
