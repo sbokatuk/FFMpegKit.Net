@@ -60,8 +60,24 @@
     <Compile Include="Platforms/iOS/**/*.cs" />
   </ItemGroup>
 
+  <!--
+    Deliberate per-band floors, not $(MauiVersion): the workload-provided property tracks
+    whatever the packing machine has installed, so the published package's dependency floor
+    would drift with CI runner images - one image packed a floor of 9.0.120 and instantly broke
+    every consumer pinning an older Controls patch (NU1605 package downgrade). One value cannot
+    serve every target framework either: each band's workload injects an implicit
+    Microsoft.Maui.Core at its own version, and a Controls floor from another band trips the
+    same NU1605 in this very project. These are the oldest Controls of each line this package is
+    built against; consumers on anything newer resolve their own version.
+  -->
+  <PropertyGroup>
+    <FFmpegKitMauiControlsVersion Condition="$(TargetFramework.StartsWith('net8.0'))">8.0.100</FFmpegKitMauiControlsVersion>
+    <FFmpegKitMauiControlsVersion Condition="$(TargetFramework.StartsWith('net9.0'))">9.0.30</FFmpegKitMauiControlsVersion>
+    <FFmpegKitMauiControlsVersion Condition="$(TargetFramework.StartsWith('net10.0'))">10.0.0</FFmpegKitMauiControlsVersion>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(FFmpegKitMauiControlsVersion)" />
     <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType)" Version="[$(FFmpegKitDependencyVersion)]" />
   </ItemGroup>
 

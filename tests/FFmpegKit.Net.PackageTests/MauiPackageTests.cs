@@ -27,6 +27,17 @@ public class MauiPackageTests
 
             Assert.Contains(Packages.CrossPlatformPackageId, ids);
             Assert.Contains("Microsoft.Maui.Controls", ids);
+
+            // Deliberate per-band floors, not the packing machine's workload version - one CI
+            // image packed a 9.0.120 floor and broke every consumer pinning an older Controls
+            // patch. Must match FFmpegKitMauiControlsVersion in FFmpegKit.Net.Maui.csproj.
+            var expectedControlsFloor = tfm.Split('.')[0] switch
+            {
+                "net8" => "8.0.100",
+                "net9" => "9.0.30",
+                _ => "10.0.0",
+            };
+            Assert.Equal(expectedControlsFloor, Packages.DependencyVersion(nuspec, tfm, "Microsoft.Maui.Controls"));
         }
     }
 

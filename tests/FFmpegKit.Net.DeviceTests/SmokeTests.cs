@@ -157,7 +157,7 @@ public static class SmokeTests
     {
         var input = Path.Combine(workingDirectory, "progress.raw");
         var output = Path.Combine(workingDirectory, "progress.mp4");
-        WriteRawFrames(input, frameCount: 600);
+        WriteRawFrames(input, frameCount: 1800);
         File.Delete(output);
 
         // Not Progress<T>: that posts to a synchronization context and would need a drain wait.
@@ -165,11 +165,13 @@ public static class SmokeTests
         // completes every sample has been recorded.
         var progress = new CollectingProgress();
 
-        // 600 frames at 30fps is 20 seconds of material, so percent is computable.
-        var total = TimeSpan.FromSeconds(600 / 30.0);
+        // 1800 frames at 30fps is 60 seconds of material, upscaled so the encode cannot finish
+        // inside FFmpeg's first statistics interval - a CI emulator once encoded a lighter
+        // version of this so fast that every reported position was still zero.
+        var total = TimeSpan.FromSeconds(1800 / 30.0);
         var result = await FFmpeg.ExecuteAsync(
             $"-y -f rawvideo -pixel_format rgb24 -video_size {FrameWidth}x{FrameHeight} " +
-            $"-framerate 30 -i \"{input}\" -c:v mpeg4 \"{output}\"",
+            $"-framerate 30 -i \"{input}\" -vf scale=640:480 -c:v mpeg4 \"{output}\"",
             progress,
             total);
 
