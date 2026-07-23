@@ -402,6 +402,6 @@ FodyWeavers.xsd
 
 # Device/simulator test output
 device-tests-logcat.txt
-device-tests-simulator.log
+simulator-tests.log
 
 .DS_Store

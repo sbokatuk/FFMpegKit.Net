@@ -82,6 +82,15 @@ public static class Packages
     public static ZipArchive OpenPackage(string packageId, string extension = ".nupkg") =>
         ZipFile.OpenRead(FindPackage(packageId, extension));
 
+    public static string ReadEntryText(ZipArchive package, string entryName)
+    {
+        var entry = package.GetEntry(entryName);
+        Assert.True(entry is not null, $"'{entryName}' is not packed.");
+
+        using var reader = new StreamReader(entry!.Open());
+        return reader.ReadToEnd();
+    }
+
     public static XDocument ReadNuspec(ZipArchive package, string packageId)
     {
         var entry = package.GetEntry($"{packageId}.nuspec");

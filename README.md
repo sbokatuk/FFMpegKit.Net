@@ -17,6 +17,10 @@ if (session.Succeeded)
     Console.WriteLine("done");
 ```
 
+> If your app's own root namespace starts with `FFmpegKit` (say, `FFmpegKit.Net.Sample`), the bare
+> `FFmpegKit` above resolves to your namespace instead of the class - qualify the call as
+> `Ffmpegkit.Net.FFmpegKit.ExecuteAsync(...)`, as [the sample](samples/README.md) does.
+
 ## Packages
 
 Every package below comes in eight variants - substitute `Full` for `Audio`, `FullGpl`, `Https`,
@@ -76,6 +80,15 @@ build/BuildNugets.sh    # packs the cross-platform client and the MAUI package i
 Requires macOS: both packages multi-target Android and iOS together, so restoring either needs
 the iOS workload regardless of which platform's code you are exercising.
 
+## Testing
+
+Three tiers, described in [docs/BUILD.md](docs/BUILD.md#testing): fast desktop unit tests for the
+platform-neutral logic (`dotnet test tests/FFmpegKit.Net.UnitTests`), package-shape tests over the
+packed `.nupkg` files, and on-device smoke tests that run real FFmpeg commands through the
+cross-platform API on an Android emulator and an iOS simulator - CI runs them on every pull
+request as a matrix over the net8 and net10 asset sets in parallel, the two extremes of what the
+packages ship.
+
 ## License
 
 > This section describes what upstream states. It is not legal advice - if the distinction
@@ -95,6 +108,11 @@ them as separate artifacts specifically so they never contaminate the LGPL ones.
 closed-source, use a non-GPL variant.** Neither package built in this repository embeds any native
 payload of its own, but each declares the same expression as whichever binding it resolves to for
 a given target framework - that is what a consumer actually ends up shipping transitively.
+
+Every package ships the texts it is covered by under `licenses/` - `LICENSE` (MIT, this
+repository's code) and `LGPL-3.0.txt` or `GPL-3.0.txt` (the native binaries) - the same texts as
+in this repository's [`licenses/`](licenses) folder, matching what the platform binding packages
+already do.
 
 [ffmpegkit-android]: https://github.com/sbokatuk/FFmpegKit.Android
 [ffmpegkit-ios]: https://github.com/sbokatuk/FFmpegKit.iOS

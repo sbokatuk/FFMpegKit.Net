@@ -16,7 +16,7 @@ packages already published to nuget.org.
 Directory.Build.props        external binding pins, target frameworks, shared package metadata
 global.json                  pins the .NET 9 SDK (the "net9 band")
 NuGet.config                 nuget.org + ./artifacts, so tests and the sample consume packed packages
-licenses/                    MIT (this repository), LGPL-3.0.txt / GPL-3.0.txt (native FFmpeg)
+licenses/                    LGPL-3.0.txt / GPL-3.0.txt (native FFmpeg); packed into each package together with the root MIT LICENSE
 build/
   BuildNugets.sh              two-pass pack + merge -> ./artifacts, for both projects and every variant
   merge-packages.py           combines the two SDK-band passes into one package per id
@@ -24,7 +24,9 @@ src/
   FFmpegKit.Net/               the cross-platform client (FFmpegKit, FFprobeKit, FFmpegKitConfig)
   FFmpegKit.Net.Maui/          the .NET MAUI package (app-builder wiring, FilePicker helper)
 tests/
+  FFmpegKit.Net.UnitTests/     fast desktop tests for the platform-neutral logic (parsing, progress math)
   FFmpegKit.Net.PackageTests/  inspects the packed .nupkg files for the Full variant
+  FFmpegKit.Net.DeviceTests/   on-device e2e for the cross-platform API (one project, Android + iOS heads)
 samples/
   FFmpegKit.Net.Sample/        one MAUI sample exercising FFmpegKit.Net.Full.Maui on both platforms
 ```
@@ -102,17 +104,40 @@ packed second, once the local feed already has the other.
 
 ## Testing
 
+Three tiers, cheapest first:
+
 ```sh
-build/BuildNugets.sh                                      # produce ./artifacts first
+dotnet test tests/FFmpegKit.Net.UnitTests                 # no artifacts needed
+build/BuildNugets.sh                                      # produce ./artifacts for the rest
 dotnet test tests/FFmpegKit.Net.PackageTests
 ```
 
-Scoped to the `Full` variant - see [`Packages.cs`](../tests/FFmpegKit.Net.PackageTests/Packages.cs)
-for why repeating identical shape checks across all eight variants adds little. Checks: an
-assembly for every target framework on both platforms, the cross-platform and MAUI nuspecs'
-per-framework dependency groups pointing at the right external package **and version** (not just
-the right id - a merge that silently dropped the pin would still pass an id-only check), and the
-license expression on every package matching what `Full` actually ships (LGPL-3.0).
+**UnitTests** compile the platform-neutral sources (`MediaValues`, `FFmpegProgress`, the result
+records) directly into a plain `net9.0` project - the packable project only targets
+`net*-android`/`net*-ios`, so it cannot be project-referenced from a desktop test - and cover the
+invariant-culture parsing and the progress clamping/ETA rules without any device in the loop.
+
+**PackageTests** are scoped to the `Full` variant - see
+[`Packages.cs`](../tests/FFmpegKit.Net.PackageTests/Packages.cs) for why repeating identical shape
+checks across all eight variants adds little. Checks: an assembly for every target framework on
+both platforms, the cross-platform and MAUI nuspecs' per-framework dependency groups pointing at
+the right external package **and version** (not just the right id - a merge that silently dropped
+the pin would still pass an id-only check), the license expression on every package matching what
+`Full` actually ships (LGPL-3.0), and the licence texts themselves being packed.
+
+**DeviceTests** run one shared set of smoke checks - encode, probe, progress, cancellation, log
+callbacks - through `Ffmpegkit.Net` only, hosted by a plain Android activity or a plain iOS app.
+They consume the packed `FFmpegKit.Net.<Variant>` NuGet from `./artifacts` (which is why the
+project is not in the `.sln`: a fresh clone has no artifacts to restore). The same scripts CI
+uses run them locally:
+
+```sh
+# Android: against a booted emulator or device (override the RID for arm64 hardware)
+FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8.1.2.1 net9.0-android35.0
+
+# iOS: boots a simulator itself
+./.github/scripts/run-simulator-tests.sh Video 8.1.2.1 net9.0-ios18.0
+```
 
 ## CI
 

@@ -29,4 +29,21 @@ public class MauiPackageTests
             Assert.Contains("Microsoft.Maui.Controls", ids);
         }
     }
+
+    [Fact]
+    public void Package_ships_the_licence_texts_it_declares()
+    {
+        using var package = Packages.OpenPackage(Packages.MauiPackageId);
+
+        var bindings = Packages.ReadEntryText(package, "licenses/LICENSE");
+        Assert.Contains("MIT License", bindings, StringComparison.OrdinalIgnoreCase);
+
+        var expectedFile = $"licenses/{Packages.NativeLicense().Replace("-only", string.Empty)}.txt";
+        var native = Packages.ReadEntryText(package, expectedFile);
+
+        var expectedTitle = Packages.IsGpl()
+            ? "GNU GENERAL PUBLIC LICENSE"
+            : "GNU LESSER GENERAL PUBLIC LICENSE";
+        Assert.StartsWith(expectedTitle, native.TrimStart(), StringComparison.Ordinal);
+    }
 }

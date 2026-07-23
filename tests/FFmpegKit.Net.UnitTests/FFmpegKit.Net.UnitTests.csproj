@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Fast desktop tests for the platform-neutral logic in src/FFmpegKit.Net - the invariant-culture
+    parsing (MediaValues), the progress clamping and ETA math (FFmpegProgress.From) and the small
+    computed members on the result records. Everything else in that project is a partial method
+    implemented per platform and is exercised by the sample build and the device tests instead.
+
+    FFmpegKit.Net only targets net*-android / net*-ios, so a plain net9.0 test project cannot take
+    a ProjectReference to it - the shared sources are compiled in directly. Only files with no
+    platform dependency may be linked here; anything under Platforms/ must stay out.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../src/FFmpegKit.Net/FFmpegLogLevel.cs" LinkBase="Shared" />
+    <Compile Include="../../src/FFmpegKit.Net/FFmpegProgress.cs" LinkBase="Shared" />
+    <Compile Include="../../src/FFmpegKit.Net/FFmpegSessionResult.cs" LinkBase="Shared" />
+    <Compile Include="../../src/FFmpegKit.Net/MediaInfo.cs" LinkBase="Shared" />
+    <Compile Include="../../src/FFmpegKit.Net/MediaValues.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

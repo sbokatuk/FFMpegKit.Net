@@ -76,6 +76,9 @@
     <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' == 'true' ">GPL-3.0-only</FFmpegKitNativeLicense>
     <FFmpegKitNativeLicense Condition=" '$(FFmpegKitIsGpl)' != 'true' ">LGPL-3.0-only</FFmpegKitNativeLicense>
 
+    <FFmpegKitNativeLicenseFile Condition=" '$(FFmpegKitIsGpl)' == 'true' ">../../licenses/GPL-3.0.txt</FFmpegKitNativeLicenseFile>
+    <FFmpegKitNativeLicenseFile Condition=" '$(FFmpegKitIsGpl)' != 'true' ">../../licenses/LGPL-3.0.txt</FFmpegKitNativeLicenseFile>
+
     <FFmpegKitVariantName>$(FFmpegKitBuildType.ToLowerInvariant().Replace('gpl', '-gpl'))</FFmpegKitVariantName>
   </PropertyGroup>
 
@@ -95,6 +98,12 @@
   <ItemGroup>
     <None Include="../../build/icon.png" Pack="true" PackagePath="/" Visible="false" />
     <None Include="../../README.md" Pack="true" PackagePath="/" Visible="false" />
+    <!--
+      Ship both licence texts the package is covered by - same reasoning as FFmpegKit.Net.csproj.
+      Packed into a folder so each file keeps its own name.
+    -->
+    <None Include="../../LICENSE" Pack="true" PackagePath="licenses/" Visible="false" />
+    <None Include="$(FFmpegKitNativeLicenseFile)" Pack="true" PackagePath="licenses/" Visible="false" />
   </ItemGroup>
 
 </Project>

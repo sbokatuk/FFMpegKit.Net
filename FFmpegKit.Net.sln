@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFmpegKit.Net.Maui", "src\F
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFmpegKit.Net.PackageTests", "tests\FFmpegKit.Net.PackageTests\FFmpegKit.Net.PackageTests.csproj", "{5C93FF43-8BE6-4B26-9148-622C15ED85F3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFmpegKit.Net.UnitTests", "tests\FFmpegKit.Net.UnitTests\FFmpegKit.Net.UnitTests.csproj", "{2A6391A3-8E37-4FD8-966D-75E33E8D9893}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -59,6 +61,18 @@ Global
 		{5C93FF43-8BE6-4B26-9148-622C15ED85F3}.Release|x64.Build.0 = Release|Any CPU
 		{5C93FF43-8BE6-4B26-9148-622C15ED85F3}.Release|x86.ActiveCfg = Release|Any CPU
 		{5C93FF43-8BE6-4B26-9148-622C15ED85F3}.Release|x86.Build.0 = Release|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Debug|x64.Build.0 = Debug|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Debug|x86.Build.0 = Debug|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Release|x64.ActiveCfg = Release|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Release|x64.Build.0 = Release|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Release|x86.ActiveCfg = Release|Any CPU
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -67,5 +81,6 @@ Global
 		{148A1795-38EE-4A44-AC53-62AA9D45B2F9} = {A34308D6-BF0A-41F0-BB86-8CA06A0807B0}
 		{365BD8D0-2672-400E-9A07-D9ABC43A0890} = {A34308D6-BF0A-41F0-BB86-8CA06A0807B0}
 		{5C93FF43-8BE6-4B26-9148-622C15ED85F3} = {23AD7C7A-A30F-45C9-AAA4-802B8CC9BBC3}
+		{2A6391A3-8E37-4FD8-966D-75E33E8D9893} = {23AD7C7A-A30F-45C9-AAA4-802B8CC9BBC3}
 	EndGlobalSection
 EndGlobal
