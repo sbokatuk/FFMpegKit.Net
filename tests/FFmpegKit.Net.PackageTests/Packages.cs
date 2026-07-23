@@ -26,8 +26,9 @@ public static class Packages
     /// </summary>
     public const string AndroidPackageVersion = "8.1.2.4";
     public const string IosPackageVersion = "8.1.2.1";
+    public const string MacPackageVersion = "8.1.2.1";
 
-    /// <summary>Target frameworks every variant-parameterized package must carry.</summary>
+    /// <summary>Target frameworks the cross-platform client must carry.</summary>
     public static readonly string[] AndroidTargetFrameworks =
     [
         "net8.0-android34.0", "net9.0-android35.0", "net10.0-android36.0",
@@ -36,6 +37,15 @@ public static class Packages
     public static readonly string[] IosTargetFrameworks =
     [
         "net8.0-ios18.0", "net9.0-ios18.0", "net10.0-ios26.0",
+    ];
+
+    /// <summary>
+    /// Client only: FFmpegKit.Net.Maui stays Android+iOS, since MAUI has no net*-macos head (its
+    /// "Mac" is Mac Catalyst, for which no native FFmpegKit slice exists).
+    /// </summary>
+    public static readonly string[] MacTargetFrameworks =
+    [
+        "net8.0-macos14.0", "net9.0-macos15.0", "net10.0-macos26.0",
     ];
 
     public static bool IsGpl(string variant = Variant) => variant.EndsWith("Gpl", StringComparison.Ordinal);
@@ -50,6 +60,7 @@ public static class Packages
     /// </summary>
     public static string AndroidPackageId => $"FFmpegKit.Net.{Variant}.Android";
     public static string IosPackageId => $"FFmpegKit.Net.{Variant}.iOS";
+    public static string MacPackageId => $"FFmpegKit.Net.{Variant}.Mac";
 
     public static string CrossPlatformPackageId => $"FFmpegKit.Net.{Variant}";
     public static string MauiPackageId => $"FFmpegKit.Net.{Variant}.Maui";

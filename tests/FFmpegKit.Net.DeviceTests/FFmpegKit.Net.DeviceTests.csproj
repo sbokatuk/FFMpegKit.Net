@@ -50,6 +50,11 @@
     <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'macos'">
+    <!-- 12.0 is the floor the .NET 9 macOS SDK enforces. -->
+    <SupportedOSPlatformVersion>12.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
   <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
     <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
     <!--
@@ -71,6 +76,10 @@
 
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
     <Compile Include="Platforms/iOS/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'macos'">
+    <Compile Include="Platforms/MacOS/**/*.cs" />
   </ItemGroup>
 
   <!--

@@ -18,7 +18,7 @@ public class CrossPlatformPackageTests
     {
         using var package = Packages.OpenPackage(Packages.CrossPlatformPackageId);
 
-        foreach (var tfm in Packages.AndroidTargetFrameworks.Concat(Packages.IosTargetFrameworks))
+        foreach (var tfm in Packages.AndroidTargetFrameworks.Concat(Packages.IosTargetFrameworks).Concat(Packages.MacTargetFrameworks))
         {
             var expected = $"lib/{tfm}/{Packages.CrossPlatformPackageId}.dll";
             Assert.True(package.GetEntry(expected) is not null, $"{Packages.CrossPlatformPackageId} is missing '{expected}'.");
@@ -54,6 +54,23 @@ public class CrossPlatformPackageTests
             Assert.Contains(Packages.IosPackageId, ids);
             Assert.DoesNotContain(Packages.AndroidPackageId, ids);
             Assert.Equal(Packages.IosPackageVersion, Packages.DependencyVersion(nuspec, tfm, Packages.IosPackageId));
+        }
+    }
+
+    [Fact]
+    public void Every_macos_target_framework_depends_on_the_pinned_mac_binding_version()
+    {
+        using var package = Packages.OpenPackage(Packages.CrossPlatformPackageId);
+        var nuspec = Packages.ReadNuspec(package, Packages.CrossPlatformPackageId);
+
+        foreach (var tfm in Packages.MacTargetFrameworks)
+        {
+            var ids = Packages.DependencyIds(nuspec, tfm).ToList();
+
+            Assert.Contains(Packages.MacPackageId, ids);
+            Assert.DoesNotContain(Packages.AndroidPackageId, ids);
+            Assert.DoesNotContain(Packages.IosPackageId, ids);
+            Assert.Equal(Packages.MacPackageVersion, Packages.DependencyVersion(nuspec, tfm, Packages.MacPackageId));
         }
     }
 

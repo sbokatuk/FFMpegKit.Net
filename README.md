@@ -63,11 +63,16 @@ cross-platform layer happens to cover. Where the native binaries come from, how 
 versions itself, and how to build them from source are questions for their own repositories:
 [sbokatuk/FFmpegKit.Android][ffmpegkit-android] and [sbokatuk/FFmpegKit.iOS][ffmpegkit-ios].
 
-Android and iOS binding versions are pinned independently in
+Android, iOS and macOS binding versions are pinned independently in
 [Directory.Build.props](Directory.Build.props) and do not track each other - see that file's
-comments before assuming one implies the other.
+comments before assuming one implies another.
 
-**Mac Catalyst is not supported.** Neither binding publishes a Catalyst slice.
+**macOS is supported by the cross-platform client only** (`net*-macos`, via
+[sbokatuk/FFmpegKit.Mac][ffmpegkit-mac]): a plain .NET for macOS or AppKit app references
+`FFmpegKit.Net.<Variant>` directly and gets the same API as Android and iOS. `FFmpegKit.Net.Maui`
+stays Android+iOS, because MAUI has no `net*-macos` head - its "Mac" is **Mac Catalyst, which is
+not supported**: no binding publishes a Catalyst slice, and none can, since no live source ships
+Catalyst binaries. The Mac repository carries its own native AppKit sample.
 
 ## Building
 
@@ -116,3 +121,4 @@ already do.
 
 [ffmpegkit-android]: https://github.com/sbokatuk/FFmpegKit.Android
 [ffmpegkit-ios]: https://github.com/sbokatuk/FFmpegKit.iOS
+[ffmpegkit-mac]: https://github.com/sbokatuk/FFmpegKit.Mac

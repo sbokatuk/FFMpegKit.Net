@@ -59,6 +59,9 @@ fi
 if [ -n "${3:-}" ]; then
     NATIVE_ARGS="${NATIVE_ARGS} -p:FFmpegKitIosPackageVersion=${3}"
 fi
+if [ -n "${4:-}" ]; then
+    NATIVE_ARGS="${NATIVE_ARGS} -p:FFmpegKitMacPackageVersion=${4}"
+fi
 
 mkdir -p "${OUTPUT}"
 

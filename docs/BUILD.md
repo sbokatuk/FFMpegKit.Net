@@ -60,6 +60,11 @@ carries the current target framework and the previous one only. Verified support
 | --- | --- | --- |
 | Android | `net8.0-android34.0`, `net9.0-android35.0` | `net10.0-android36.0` |
 | iOS | `net8.0-ios18.0`, `net9.0-ios18.0` | `net10.0-ios26.0` |
+| macOS | `net8.0-macos14.0`, `net9.0-macos15.0` | `net10.0-macos26.0` |
+
+macOS is carried by the cross-platform client only - `FFmpegKit.Net.Maui` stays Android+iOS,
+since MAUI has no `net*-macos` head (its "Mac" is Mac Catalyst, which no native FFmpegKit build
+supports).
 
 So `build/BuildNugets.sh` packs each project twice per variant - once under the SDK `global.json`
 pins, once from a scratch directory whose own `global.json` selects the .NET 10 SDK - and

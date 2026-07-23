@@ -24,7 +24,7 @@
     per variant.
   -->
   <PropertyGroup>
-    <TargetFrameworks>$(FFmpegKitAndroidTargetFrameworks);$(FFmpegKitIosTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(FFmpegKitAndroidTargetFrameworks);$(FFmpegKitIosTargetFrameworks);$(FFmpegKitMacTargetFrameworks)</TargetFrameworks>
 
     <AssemblyName>FFmpegKit.Net.$(FFmpegKitBuildType)</AssemblyName>
     <RootNamespace>Ffmpegkit.Net</RootNamespace>
@@ -52,6 +52,11 @@
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
     <Compile Include="Platforms/iOS/**/*.cs" />
     <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).iOS" Version="[$(FFmpegKitIosPackageVersion)]" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'macos'">
+    <Compile Include="Platforms/MacOS/**/*.cs" />
+    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitBuildType).Mac" Version="[$(FFmpegKitMacPackageVersion)]" />
   </ItemGroup>
 
   <!--

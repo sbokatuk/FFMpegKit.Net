@@ -104,6 +104,7 @@ jobs:
 
           android_pin=$(sed -n 's:.*<FFmpegKitAndroidPackageVersion>\(.*\)</FFmpegKitAndroidPackageVersion>.*:\1:p' Directory.Build.props | head -1)
           ios_pin=$(sed -n 's:.*<FFmpegKitIosPackageVersion>\(.*\)</FFmpegKitIosPackageVersion>.*:\1:p' Directory.Build.props | head -1)
+          mac_pin=$(sed -n 's:.*<FFmpegKitMacPackageVersion>\(.*\)</FFmpegKitMacPackageVersion>.*:\1:p' Directory.Build.props | head -1)
 
           {
             if [ -f "${notes}" ]; then
@@ -127,8 +128,9 @@ jobs:
             echo "## Packages"
             echo
             echo "Every variant below ships as a cross-platform package with no suffix, and as"
-            echo "\`.Maui\`; both depend on FFmpegKit.Net.<Variant>.Android \`${android_pin}\` and"
-            echo "FFmpegKit.Net.<Variant>.iOS \`${ios_pin}\` - see the root README."
+            echo "\`.Maui\`; they depend on FFmpegKit.Net.<Variant>.Android \`${android_pin}\`,"
+            echo "FFmpegKit.Net.<Variant>.iOS \`${ios_pin}\` and FFmpegKit.Net.<Variant>.Mac"
+            echo "\`${mac_pin}\` (the client's net*-macos leg) - see the root README."
             echo
             echo "| Variant | License |"
             echo "| --- | --- |"

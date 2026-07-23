@@ -405,3 +405,5 @@ device-tests-logcat.txt
 simulator-tests.log
 
 .DS_Store
+
+mac-host-tests.log
