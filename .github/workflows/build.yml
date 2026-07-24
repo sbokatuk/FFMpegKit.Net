@@ -1,0 +1,380 @@
+name: build
+
+# Reusable pipeline: builds FFmpegKit.Net's two packages (the cross-platform client and the MAUI
+# package) at a given version, for all eight variants, validates the packed packages, and uploads
+# them as an artifact. Callers (pr.yml, release.yml) decide the version and what to do with the
+# result.
+#
+# This repository does not build the Android or iOS bindings - both packages depend on them as
+# ordinary NuGet packages already published to nuget.org from sbokatuk/FFmpegKit.Android and
+# sbokatuk/FFmpegKit.iOS, pinned to an exact version in Directory.Build.props. Everything here
+# packs on macos-latest: both packages multi-target Android and iOS together, so restoring either
+# needs the iOS workload regardless of which platform's code is being exercised.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: NuGet version to stamp on every package.
+        required: true
+        type: string
+      android-package-version:
+        description: >
+          FFmpegKit.Net.<Variant>.Android version to depend on. Defaults to
+          FFmpegKitAndroidPackageVersion in Directory.Build.props.
+        required: false
+        default: ''
+        type: string
+      ios-package-version:
+        description: >
+          FFmpegKit.Net.<Variant>.iOS version to depend on. Defaults to FFmpegKitIosPackageVersion
+          in Directory.Build.props.
+        required: false
+        default: ''
+        type: string
+      mac-package-version:
+        description: >
+          FFmpegKit.Net.<Variant>.Mac version to depend on. Defaults to FFmpegKitMacPackageVersion
+          in Directory.Build.props.
+        required: false
+        default: ''
+        type: string
+      e2e-variant:
+        description: Which variant the device smoke tests install and run.
+        required: false
+        default: Video
+        type: string
+      e2e-android-target-frameworks:
+        description: >
+          Which Android target frameworks the emulator smoke test runs against, as a JSON array -
+          one matrix job per entry. Defaults to the two extremes: net8, the oldest asset set and
+          the one nothing else exercises, and net10, whose assets are produced by the merge step
+          in BuildNugets.sh and so are the only ones that could be grafted in wrong. net9 sits
+          between them and comes out of the same pack pass as net8, so testing it too would buy
+          little for the runner minutes.
+        required: false
+        default: '["net8.0-android34.0", "net10.0-android36.0"]'
+        type: string
+      e2e-ios-target-frameworks:
+        description: Same, for the simulator smoke test.
+        required: false
+        default: '["net8.0-ios18.0", "net10.0-ios26.0"]'
+        type: string
+      e2e-mac-target-frameworks:
+        description: Same, for the macOS host smoke test.
+        required: false
+        default: '["net8.0-macos14.0", "net10.0-macos26.0"]'
+        type: string
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  pack:
+    name: pack
+    runs-on: macos-latest
+    outputs:
+      android-package-version: ${{ steps.pins.outputs.android }}
+      ios-package-version: ${{ steps.pins.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Install iOS/Android/MAUI workloads for every SDK band
+        run: |
+          for major in 9 10; do
+            dir="${RUNNER_TEMP}/sdk${major}"
+            mkdir -p "${dir}"
+            sdk=$(dotnet --list-sdks | grep "^${major}\." | tail -1 | cut -d' ' -f1)
+            ( cd "${dir}" \
+              && dotnet new globaljson --sdk-version "${sdk}" --force \
+              && dotnet workload install android ios macos maui-ios )
+          done
+
+      # The workload provides the .NET tooling, not the Android SDK platforms it compiles
+      # against - without these the build stops at XA5207 (no android.jar for the API level).
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 platforms;android-35 platforms;android-36'
+
+      - name: Resolve external binding pins
+        id: pins
+        run: |
+          # sed, not grep -P: this job runs on macOS, whose BSD grep has no -P.
+          android="${{ inputs.android-package-version }}"
+          if [ -z "${android}" ]; then
+            android=$(sed -n 's:.*<FFmpegKitAndroidPackageVersion>\(.*\)</FFmpegKitAndroidPackageVersion>.*:\1:p' Directory.Build.props | head -1)
+          fi
+          ios="${{ inputs.ios-package-version }}"
+          if [ -z "${ios}" ]; then
+            ios=$(sed -n 's:.*<FFmpegKitIosPackageVersion>\(.*\)</FFmpegKitIosPackageVersion>.*:\1:p' Directory.Build.props | head -1)
+          fi
+          mac="${{ inputs.mac-package-version }}"
+          if [ -z "${mac}" ]; then
+            mac=$(sed -n 's:.*<FFmpegKitMacPackageVersion>\(.*\)</FFmpegKitMacPackageVersion>.*:\1:p' Directory.Build.props | head -1)
+          fi
+          if [ -z "${android}" ] || [ -z "${ios}" ] || [ -z "${mac}" ]; then
+            echo "::error::could not determine the Android/iOS/macOS binding pins"
+            exit 1
+          fi
+          echo "android=${android}" >> "$GITHUB_OUTPUT"
+          echo "ios=${ios}" >> "$GITHUB_OUTPUT"
+          echo "mac=${mac}" >> "$GITHUB_OUTPUT"
+          echo "Depending on FFmpegKit.Net.*.Android ${android}, FFmpegKit.Net.*.iOS ${ios}, FFmpegKit.Net.*.Mac ${mac}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pack the cross-platform client and MAUI package, all variants
+        run: ./build/BuildNugets.sh "${{ inputs.version }}" "${{ steps.pins.outputs.android }}" "${{ steps.pins.outputs.ios }}" "${{ steps.pins.outputs.mac }}"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  validate:
+    name: validate packages
+    needs: pack
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install Android/iOS/macOS/MAUI workloads
+        run: dotnet workload install android ios macos maui
+
+      # For the sample build below - the workload alone stops at XA5207 without the platform.
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35'
+
+      - name: Run unit tests
+        run: dotnet test tests/FFmpegKit.Net.UnitTests --logger 'trx;LogFileName=unit-tests.trx'
+
+      - name: Run package tests
+        run: dotnet test tests/FFmpegKit.Net.PackageTests --logger 'trx;LogFileName=package-tests.trx'
+
+      # The sample consumes FFmpegKit.Net.Full.Maui through a PackageReference exactly as a user
+      # would, so it is what catches an API that no longer matches what the README documents -
+      # nothing else here builds against the packed packages the way an actual consumer does.
+      # Build only, both target frameworks: proving it links is the point, not running it.
+      - name: Build the sample against the packed packages
+        run: |
+          dotnet build samples/FFmpegKit.Net.Sample/FFmpegKit.Net.Sample.csproj \
+            --configuration Release \
+            -p:FFmpegKitVersion="${{ inputs.version }}"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-test-results
+          path: '**/*.trx'
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The device tests consume the packed FFmpegKit.Net.<Variant> package - including its pinned
+  # dependency on the external platform binding from nuget.org - and drive real FFmpeg commands
+  # through the cross-platform API on each platform. The bindings' own repositories smoke-test
+  # the bindings; this proves the unified surface over them.
+  e2e-android:
+    name: emulator smoke test (${{ matrix.target-framework }})
+    timeout-minutes: 60
+    needs: pack
+    runs-on: ubuntu-latest
+    strategy:
+      # fail-fast off: when one target framework breaks it is worth knowing whether the other did
+      # too, since "net8 only" and "both" point at very different causes.
+      fail-fast: false
+      matrix:
+        target-framework: ${{ fromJSON(inputs.e2e-android-target-frameworks) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # 8.0.x is here for the net8 matrix leg only - see the workload step below.
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Install the Android workload for every SDK band
+        run: |
+          # One band per Android API level, because that is what owns the runtime packs: API 34 is
+          # the .NET 8 workload, 35 the .NET 9 one, 36 the .NET 10 one. Installing only the band
+          # global.json pins lets a net8 app compile and then fail at packaging with NETSDK1112.
+          # See the comment in run-device-tests.sh.
+          for major in 8 10; do
+            dir="${RUNNER_TEMP}/sdk${major}"
+            mkdir -p "${dir}"
+            ( cd "${dir}" \
+              && dotnet new globaljson --sdk-version "$(dotnet --list-sdks | grep "^${major}\." | tail -1 | cut -d' ' -f1)" --force \
+              && dotnet workload install android )
+          done
+          dotnet workload install android
+
+      - name: Set up Android SDK platforms
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 platforms;android-35 platforms;android-36'
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run smoke tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # The native .aar ships arm64-v8a and x86_64 only, so the emulator must be x86_64. One
+          # API 35 emulator serves every matrix leg: the target framework decides what the app is
+          # built against, not what it runs on, and minSdk is 24.
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: ./.github/scripts/run-device-tests.sh "${{ inputs.e2e-variant }}" "${{ inputs.version }}" "${{ matrix.target-framework }}"
+
+      - name: Upload device logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-test-logs-${{ matrix.target-framework }}
+          path: device-tests-logcat.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-ios:
+    name: simulator smoke test (${{ matrix.target-framework }})
+    timeout-minutes: 45
+    needs: pack
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        target-framework: ${{ fromJSON(inputs.e2e-ios-target-frameworks) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: ./.github/actions/select-xcode
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Install iOS workload
+        run: |
+          # The device app is built for the target framework under test, so install the workload
+          # for the band that owns it. global.json pins .NET 9; the app may need .NET 10.
+          mkdir -p "${RUNNER_TEMP}/sdk10"
+          ( cd "${RUNNER_TEMP}/sdk10" \
+            && dotnet new globaljson --sdk-version "$(dotnet --list-sdks | grep '^10\.' | tail -1 | cut -d' ' -f1)" --force \
+            && dotnet workload install ios )
+          dotnet workload install ios
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      - name: Run smoke tests on simulator
+        run: ./.github/scripts/run-simulator-tests.sh "${{ inputs.e2e-variant }}" "${{ inputs.version }}" "${{ matrix.target-framework }}"
+
+      - name: Upload simulator logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-test-logs-${{ matrix.target-framework }}
+          path: simulator-tests.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-mac:
+    name: macOS host smoke test (${{ matrix.target-framework }})
+    timeout-minutes: 45
+    needs: pack
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        target-framework: ${{ fromJSON(inputs.e2e-mac-target-frameworks) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: ./.github/actions/select-xcode
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Install macOS workload
+        run: |
+          # The host app is built for the target framework under test, so install the workload
+          # for the band that owns it. global.json pins .NET 9; the app may need .NET 10.
+          mkdir -p "${RUNNER_TEMP}/sdk10"
+          ( cd "${RUNNER_TEMP}/sdk10" \
+            && dotnet new globaljson --sdk-version "$(dotnet --list-sdks | grep '^10\.' | tail -1 | cut -d' ' -f1)" --force \
+            && dotnet workload install macos )
+          dotnet workload install macos
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      - name: Run smoke tests on the runner
+        run: ./.github/scripts/run-mac-host-tests.sh "${{ inputs.e2e-variant }}" "${{ inputs.version }}" "${{ matrix.target-framework }}"
+
+      - name: Upload host test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-host-test-logs-${{ matrix.target-framework }}
+          path: mac-host-tests.log
+          if-no-files-found: ignore
+          retention-days: 7

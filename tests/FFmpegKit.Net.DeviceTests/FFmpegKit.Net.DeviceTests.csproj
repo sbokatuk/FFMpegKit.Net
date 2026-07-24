@@ -1,0 +1,107 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    On-device end-to-end tests for the *cross-platform* API - the two external bindings have their
+    own device tests in their repositories; this app proves the unified surface actually drives
+    FFmpeg on both platforms: one shared SmokeTests.cs written against Ffmpegkit.Net only, hosted
+    by a plain Android activity or a plain iOS app depending on the target framework.
+
+    One project, two heads: the Android host lives in Platforms/Android, the iOS one in
+    Platforms/iOS, selected the same way src/FFmpegKit.Net picks its implementations. Deliberately
+    not a MAUI app and deliberately not referencing FFmpegKit.Net.Maui - the checks should need
+    nothing but the package under test.
+
+    NOT in FFmpegKit.Net.sln: it consumes the packed FFmpegKit.Net.<Variant> NuGet from
+    ./artifacts, so a solution restore on a fresh clone (no artifacts yet) would fail. CI and the
+    runner scripts build it directly, like the sample.
+  -->
+  <PropertyGroup>
+    <!--
+      Which of the package's target frameworks to exercise. Overriding TargetFramework directly
+      on the command line breaks restore, so it goes through a property of our own.
+    -->
+    <FFmpegKitDeviceTargetFramework Condition=" '$(FFmpegKitDeviceTargetFramework)' == '' ">net9.0-android35.0</FFmpegKitDeviceTargetFramework>
+    <TargetFramework>$(FFmpegKitDeviceTargetFramework)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <CheckEolWorkloads>false</CheckEolWorkloads>
+
+    <ApplicationId>com.sbokatuk.ffmpegkit.net.devicetests</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!--
+      The property, not an @(AndroidManifest) item. The .NET 9/10 Android SDKs synthesize a
+      manifest when none is given; the .NET 8 one reads $(AndroidManifest), defaults it to the
+      project root, and fails with XA1018 when the file is not there.
+    -->
+    <AndroidManifest>Platforms/Android/AndroidManifest.xml</AndroidManifest>
+    <!--
+      The native .aar only ships arm64-v8a and x86_64, so restrict the APK to those. Building for
+      an ABI with no native payload produces an app that installs and then fails at load time.
+    -->
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'macos'">
+    <!-- 12.0 is the floor the .NET 9 macOS SDK enforces. -->
+    <SupportedOSPlatformVersion>12.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
+    <!--
+      The smoke tests report through stdout, which the runner script streams back with
+      `simctl launch` in console-pty mode. Quietening the Mono logger keeps that stream to the
+      test output rather than runtime chatter.
+    -->
+    <MtouchExtraArgs>--setenv=MONO_LOG_LEVEL=error</MtouchExtraArgs>
+
+    <!--
+      The interpreter, explicitly. The .NET 9 iOS SDK JITs a Debug simulator build; the .NET 8
+      one puts the runtime in aot-only mode for the same command line and then dies on the first
+      assembly it has no AOT image for. Setting it for both bands keeps the matrix legs
+      comparable. See the Debug comment in run-simulator-tests.sh.
+    -->
+    <UseInterpreter>true</UseInterpreter>
+  </PropertyGroup>
+
+  <!-- Host code is picked per target framework, same as the library under test. -->
+  <ItemGroup>
+    <Compile Remove="Platforms/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <Compile Include="Platforms/Android/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <Compile Include="Platforms/iOS/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'macos'">
+    <Compile Include="Platforms/MacOS/**/*.cs" />
+  </ItemGroup>
+
+  <!--
+    The e2e deliberately consumes the packed NuGet from ./artifacts rather than a ProjectReference,
+    so it exercises the artifact that actually gets published - including its pinned dependency on
+    the external platform binding. See NuGet.config for the local feed.
+  -->
+  <PropertyGroup>
+    <FFmpegKitVariant Condition=" '$(FFmpegKitVariant)' == '' ">Video</FFmpegKitVariant>
+    <FFmpegKitPackageVersion Condition=" '$(FFmpegKitPackageVersion)' == '' ">$(VersionPrefix)</FFmpegKitPackageVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FFmpegKit.Net.$(FFmpegKitVariant)" Version="$(FFmpegKitPackageVersion)" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,94 @@
+name: Select Xcode
+description: >
+  Selects the Xcode carrying the iOS SDK the net10 target framework is built against, and
+  verifies it can resolve host tools before anything depends on it.
+
+inputs:
+  ios-sdk-version:
+    description: iOS SDK line the selected Xcode must carry.
+    required: false
+    default: '26.0'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -uo pipefail
+
+        # The packages advertise net10.0-ios26.0, and .NET for iOS only builds that target
+        # framework against an Xcode carrying the matching iOS SDK:
+        #
+        #     error : This version of .NET for iOS (26.0.11017) requires Xcode 26.0.
+        #             The current version of Xcode is 26.5.
+        #
+        # so the selection is confined to the 26.0 line rather than "any 26.x". The runner image
+        # default is older still (16.4), so one has to be chosen explicitly either way.
+        #
+        # Two traps here, both of which have already broken this pipeline:
+        #
+        #  1. `xcode-select -s` does not validate its argument. Pointing it at a path that does
+        #     not exist succeeds silently, and the failure only appears later as
+        #     "SDK ... cannot be located" from whichever step first needs the native toolchain.
+        #     The packaging job never notices at all, because packing a binding project does not
+        #     shell out to xcrun.
+        #
+        #  2. /Applications/Xcode_26.0.app on the macos-15-arm64 image reports itself as Xcode
+        #     26.0.1 and carries the iOS 26 SDK, but its macOS platform is incomplete - the
+        #     unversioned MacOSX.sdk the iOS SDK resolves host tools through is missing, so every
+        #     `xcodebuild -sdk <...>/MacOSX.sdk -find install_name_tool` fails. The image also
+        #     ships a separate, complete /Applications/Xcode_26.0.1.app.
+        #
+        #     Hence newest patch first: 26.0.1 beats the broken 26.0 alias, matching what the
+        #     AntMedia.Net repository settled on for the same runners. Candidates are still
+        #     probed, so a bad bundle is skipped rather than selected and discovered mid-build.
+        ios_sdk_version='${{ inputs.ios-sdk-version }}'
+        selected=""
+
+        for app in $(ls -d "/Applications/Xcode_${ios_sdk_version}"*.app 2>/dev/null | sort -Vr); do
+          developer="${app}/Contents/Developer"
+          [ -d "${developer}" ] || continue
+          name="$(basename "${app}")"
+
+          sdk_root="${developer}/Platforms/MacOSX.platform/Developer/SDKs"
+          macos_sdk="${sdk_root}/MacOSX.sdk"
+
+          # A missing unversioned symlink is repairable - the runner is ephemeral - so try that
+          # before writing the candidate off.
+          if [ ! -d "${macos_sdk}" ]; then
+            versioned="$(ls -d "${sdk_root}/"MacOSX*.sdk 2>/dev/null | sort -V | tail -1)"
+            if [ -z "${versioned}" ]; then
+              echo "skipping ${name}: no macOS SDK at all"
+              continue
+            fi
+            echo "${name}: MacOSX.sdk is missing, linking it to $(basename "${versioned}")"
+            sudo ln -sfn "${versioned}" "${macos_sdk}"
+          fi
+
+          # The exact lookup the build performs, through the same literal path. Probed with
+          # DEVELOPER_DIR rather than by switching the whole machine over, so a candidate can be
+          # rejected without leaving a broken global selection behind.
+          if ! DEVELOPER_DIR="${developer}" xcodebuild -sdk "${macos_sdk}" -find install_name_tool > /dev/null 2>&1; then
+            echo "skipping ${name}: cannot resolve host tools through ${macos_sdk}"
+            continue
+          fi
+
+          selected="${app}"
+          break
+        done
+
+        if [ -z "${selected}" ]; then
+          echo "::error::no usable Xcode carrying the iOS ${ios_sdk_version} SDK is installed on this runner"
+          for app in $(ls -d /Applications/Xcode*.app 2>/dev/null); do
+            echo "--- ${app}"
+            echo "  iOS SDKs:   $(ls "${app}/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs" 2>/dev/null | tr '\n' ' ')"
+            echo "  macOS SDKs: $(ls "${app}/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs" 2>/dev/null | tr '\n' ' ')"
+          done
+          exit 1
+        fi
+
+        echo "selecting ${selected}"
+        sudo xcode-select -s "${selected}"
+        xcodebuild -version
+
+        echo "DEVELOPER_DIR=${selected}/Contents/Developer" >> "$GITHUB_ENV"

@@ -1,0 +1,128 @@
+<Project>
+
+  <!--
+    ============================================================================
+    External binding package pins
+    ============================================================================
+    This repository does not build the Android or iOS bindings itself: it depends on the
+    FFmpegKit.Net.<Variant>.Android and FFmpegKit.Net.<Variant>.iOS packages already published to
+    nuget.org from sbokatuk/FFmpegKit.Android and sbokatuk/FFmpegKit.iOS respectively. Those two
+    repositories version independently of each other and of this one - see their own READMEs -
+    so bumping one pin here does not imply bumping the other.
+  -->
+  <PropertyGroup>
+    <!--
+      The FFmpeg build this repository's own packages advertise as wrapping. Not read by anything
+      that talks to nuget.org - it only feeds VersionPrefix below - but kept aligned with the
+      Android/iOS pins so the three numbers do not drift apart in the READMEs and package
+      descriptions.
+    -->
+    <FFmpegVersion>8.1.2</FFmpegVersion>
+
+    <!--
+      Exact versions of the external bindings to depend on, checked via nuget.org's search API
+      (the flat-container versions list also includes older, unlisted releases and is not safe to
+      read the latest version from directly - see docs/BUILD.md). Pinned with an exact bracket
+      range in the .csproj ([version]) rather than left floating, so a new upstream release does
+      not change what this repository packs until this pin is bumped deliberately.
+    -->
+    <FFmpegKitAndroidPackageVersion>8.1.2.4</FFmpegKitAndroidPackageVersion>
+    <FFmpegKitIosPackageVersion>8.1.2.1</FFmpegKitIosPackageVersion>
+    <FFmpegKitMacPackageVersion>8.1.2.1</FFmpegKitMacPackageVersion>
+
+    <!--
+      Belongs to this repository, not to either external binding. Increments whenever the
+      cross-platform layer or the MAUI package changes while FFmpegVersion stays put.
+    -->
+    <FFmpegKitBindingRevision>1</FFmpegKitBindingRevision>
+    <VersionPrefix>$(FFmpegVersion).$(FFmpegKitBindingRevision)</VersionPrefix>
+
+    <!--
+      Which FFmpegKit variant to build: Audio, Full, FullGpl, Https, HttpsGpl, Min, MinGpl, Video.
+      CI builds each of these in turn for both variant-parameterized projects (the cross-platform
+      client and the MAUI package).
+    -->
+    <FFmpegKitBuildType Condition=" '$(FFmpegKitBuildType)' == '' ">Video</FFmpegKitBuildType>
+
+    <Authors>s.bokatuk</Authors>
+    <Company>s.bokatuk</Company>
+    <Copyright>Copyright © s.bokatuk</Copyright>
+    <PackageProjectUrl>https://github.com/sbokatuk/FFmpegKit.Net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/sbokatuk/FFmpegKit.Net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <!--
+      No PackageLicenseExpression here: it is not one value for the whole repository. The C#
+      source is MIT, but each package transitively pulls in an external binding whose native
+      FFmpeg binaries are LGPL-3.0 or GPL-3.0 depending on the variant, so the expression is built
+      per variant in FFmpegKit.Net.csproj / FFmpegKit.Net.Maui.csproj - that is what a consumer
+      actually ends up with, even though neither project embeds any native payload itself.
+    -->
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition=" '$(GITHUB_ACTIONS)' == 'true' ">true</ContinuousIntegrationBuild>
+
+    <!--
+      net8.0-* and net9.0-* are past end of support, which the SDK reports as an error. They ship
+      deliberately: .NET 8 is still where a large share of MAUI apps are.
+    -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <CheckEolWorkloads>false</CheckEolWorkloads>
+  </PropertyGroup>
+
+  <!--
+    ============================================================================
+    Target frameworks
+    ============================================================================
+    No single .NET SDK can build net8, net9 and net10 for a given platform - each SDK's workload
+    carries the current target framework and the previous one only. Verified support matrix:
+
+                  SDK 9 band                              SDK 10 band
+      Android     net8.0-android34.0, net9.0-android35.0  net10.0-android36.0
+      iOS         net8.0-ios18.0,     net9.0-ios18.0       net10.0-ios26.0
+      macOS       net8.0-macos14.0,   net9.0-macos15.0     net10.0-macos26.0
+
+    So every variant-parameterized project is packed twice and the results merged - see
+    build/BuildNugets.sh and build/merge-packages.py. FFmpegKitSdkBand selects which pass a given
+    build is.
+
+    The platform version in each target framework is pinned deliberately, matching what the
+    external Android/iOS packages themselves target - a mismatch would fail restore.
+  -->
+  <PropertyGroup>
+    <FFmpegKitSdkBand Condition=" '$(FFmpegKitSdkBand)' == '' ">net9</FFmpegKitSdkBand>
+
+    <FFmpegKitAndroidTargetFrameworks Condition=" '$(FFmpegKitSdkBand)' == 'net9' ">net8.0-android34.0;net9.0-android35.0</FFmpegKitAndroidTargetFrameworks>
+    <FFmpegKitAndroidTargetFrameworks Condition=" '$(FFmpegKitSdkBand)' == 'net10' ">net10.0-android36.0</FFmpegKitAndroidTargetFrameworks>
+
+    <FFmpegKitIosTargetFrameworks Condition=" '$(FFmpegKitSdkBand)' == 'net9' ">net8.0-ios18.0;net9.0-ios18.0</FFmpegKitIosTargetFrameworks>
+    <FFmpegKitIosTargetFrameworks Condition=" '$(FFmpegKitSdkBand)' == 'net10' ">net10.0-ios26.0</FFmpegKitIosTargetFrameworks>
+
+    <!--
+      macOS is the cross-platform client only: FFmpegKit.Net.Maui stays Android+iOS, because MAUI
+      has no net*-macos head (its "Mac" is Mac Catalyst, for which no native FFmpegKit slice is
+      published anywhere - see sbokatuk/FFmpegKit.Mac's README).
+    -->
+    <FFmpegKitMacTargetFrameworks Condition=" '$(FFmpegKitSdkBand)' == 'net9' ">net8.0-macos14.0;net9.0-macos15.0</FFmpegKitMacTargetFrameworks>
+    <FFmpegKitMacTargetFrameworks Condition=" '$(FFmpegKitSdkBand)' == 'net10' ">net10.0-macos26.0</FFmpegKitMacTargetFrameworks>
+  </PropertyGroup>
+
+  <!--
+    ============================================================================
+    Per-variant obj/ and bin/
+    ============================================================================
+    Both variant-parameterized projects are built one after another, for all eight variants, in
+    the same working copy, and they differ only in which external binding version gets resolved -
+    a shared intermediate output would let one variant's resolved assemblies end up cached against
+    the next one's package.
+  -->
+  <PropertyGroup Condition="
+      '$(MSBuildProjectName)' == 'FFmpegKit.Net' Or
+      '$(MSBuildProjectName)' == 'FFmpegKit.Net.Maui'">
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)/obj/$(FFmpegKitBuildType)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildProjectDirectory)/bin/$(FFmpegKitBuildType)/</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+</Project>

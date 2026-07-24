@@ -60,7 +60,10 @@ BenchmarkDotNet.Artifacts/
 # .NET Core
 project.lock.json
 project.fragment.lock.json
-artifacts/
+# Contents only, not the directory itself: NuGet.config exposes artifacts/ as a package
+# source, and git cannot un-ignore a file inside a directory it has already ignored.
+artifacts/*
+!artifacts/.gitkeep
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
@@ -396,3 +399,11 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Device/simulator test output
+device-tests-logcat.txt
+simulator-tests.log
+
+.DS_Store
+
+mac-host-tests.log

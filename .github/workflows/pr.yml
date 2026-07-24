@@ -1,0 +1,98 @@
+name: pull request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-${{ github.event.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: resolve beta version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: resolve
+        run: |
+          # FFmpegVersion, not either FFmpegKit*NativeVersion: package versions name the FFmpeg a
+          # build contains, not either fork's own release number - see Directory.Build.props. The
+          # PR number and run number make each prerelease unique, since nuget.org never allows a
+          # version to be reused.
+          base=$(sed -n 's:.*<FFmpegVersion>\(.*\)</FFmpegVersion>.*:\1:p' Directory.Build.props | head -1)
+          if [ -z "${base}" ]; then
+            echo "::error::could not read FFmpegVersion from Directory.Build.props"
+            exit 1
+          fi
+          version="${base}-beta.${{ github.event.number }}.${{ github.run_number }}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Building ${version}" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: build
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  publish:
+    name: publish beta to nuget.org
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    # Forked pull requests get no OIDC token for this repository, so the exchange would fail with
+    # a confusing error. Those PRs still build and test; only the publish step is skipped.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Must match the Environment on the nuget.org trusted publishing policy for this workflow.
+    environment: nuget.org
+    permissions:
+      contents: read
+      # Lets the job request the OIDC token that nuget.org exchanges for a short-lived API key.
+      # Without it the token request fails silently and the login step gets no key.
+      id-token: write
+    steps:
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      # Deliberately immediately before the push: the issued key is valid for one hour, and each
+      # OIDC token can be exchanged exactly once.
+      - name: Authenticate to nuget.org
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to nuget.org
+        run: |
+          # Symbol packages are pushed automatically alongside each matching .nupkg.
+          dotnet nuget push "artifacts/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --skip-duplicate
+
+      - name: Summarise
+        run: |
+          {
+            echo "### Published \`${{ needs.version.outputs.version }}\` to nuget.org"
+            echo
+            for variant in Audio Full FullGpl Https HttpsGpl Min MinGpl Video; do
+              for suffix in "" Maui; do
+                id="FFmpegKit.Net.${variant}${suffix:+.${suffix}}"
+                echo "- [${id}](https://www.nuget.org/packages/${id}/${{ needs.version.outputs.version }})"
+              done
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Present for the .NET 8 leg: the net9/net10 Android SDKs synthesize a manifest, the .NET 8 one
+  requires the file to exist. FFmpeg encodes local files only, so no permissions are needed.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application android:label="FFmpegKit.Net e2e" />
+</manifest>

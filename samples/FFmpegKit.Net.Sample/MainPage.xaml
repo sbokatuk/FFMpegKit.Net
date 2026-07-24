@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="FFmpegKit.Net.Sample.MainPage">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="20"
+            Spacing="16">
+
+            <Label
+                Text="FFmpegKit.Net Example"
+                Style="{StaticResource Headline}"
+                SemanticProperties.HeadingLevel="Level1" />
+
+            <Label
+                Text="Pick a conversion, run it with the same FFmpegKit.Net.Full.Maui code on Android and iOS, and compare the result to the original."
+                Style="{StaticResource SubHeadline}" />
+
+            <Label Text="Conversion type" FontAttributes="Bold" />
+            <Picker x:Name="ConversionPicker" Title="Select a conversion" />
+
+            <Button
+                x:Name="ConvertBtn"
+                Text="Convert sample video"
+                Clicked="OnConvertClicked"
+                HorizontalOptions="Fill" />
+
+            <ActivityIndicator
+                x:Name="Spinner"
+                IsRunning="False"
+                IsVisible="False" />
+
+            <ProgressBar
+                x:Name="ConversionProgress"
+                Progress="0"
+                IsVisible="False" />
+
+            <Label
+                x:Name="ProgressLabel"
+                IsVisible="False"
+                FontSize="12" />
+
+            <Label
+                x:Name="StatusLabel"
+                Text="Tap the button to run an FFmpeg conversion."
+                LineBreakMode="WordWrap" />
+
+            <Label Text="Before" FontAttributes="Bold" />
+            <toolkit:MediaElement
+                x:Name="BeforePlayer"
+                HeightRequest="220"
+                ShouldAutoPlay="False"
+                ShouldShowPlaybackControls="True" />
+
+            <Label Text="After" FontAttributes="Bold" />
+            <toolkit:MediaElement
+                x:Name="AfterPlayer"
+                HeightRequest="220"
+                ShouldAutoPlay="False"
+                ShouldShowPlaybackControls="True" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
