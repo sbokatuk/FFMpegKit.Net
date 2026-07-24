@@ -21,7 +21,7 @@ dotnet build samples/FFmpegKit.Net.Sample -f net9.0-ios18.0
 ```
 
 Pass `-p:FFmpegKitVersion=<version>` to build against a specific packed version rather than the
-default (`FFmpegVersion` from `Directory.Build.props`).
+default (`VersionPrefix` from `Directory.Build.props`, i.e. the version this repository packs).
 
 It references the `Full` (LGPL) variant deliberately - swapping to a `-Gpl` one would make the
 sample itself GPL-3.0. Deliberately **not** in `FFmpegKit.Net.sln`, so that
