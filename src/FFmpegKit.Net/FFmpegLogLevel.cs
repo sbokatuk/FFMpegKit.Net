@@ -1,6 +1,6 @@
 namespace Ffmpegkit.Net;
 
-/// <summary>FFmpeg log levels, shared across both platforms.</summary>
+/// <summary>FFmpeg log levels, shared across all platforms.</summary>
 /// <remarks>
 /// The platform bindings project FFmpegKit's native <c>Level</c> as a Java enum on Android and an
 /// <c>NSInteger</c>-backed type on iOS - neither is a plain C# enum, so neither can be used in a

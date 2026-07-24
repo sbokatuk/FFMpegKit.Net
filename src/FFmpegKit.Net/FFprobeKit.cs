@@ -1,6 +1,6 @@
 namespace Ffmpegkit.Net;
 
-/// <summary>Probes media files, with the same awaitable API on Android and iOS.</summary>
+/// <summary>Probes media files, with the same awaitable API on Android, iOS and macOS.</summary>
 /// <remarks>See <see cref="Net.FFmpegKit"/> for why this layer exists and what it deliberately does not cover.</remarks>
 public static partial class FFprobeKit
 {
@@ -13,7 +13,7 @@ public static partial class FFprobeKit
     /// </returns>
     /// <remarks>
     /// No <see cref="CancellationToken"/> overload is offered. FFmpegKit exposes no cancellation
-    /// for probe sessions on either platform, so a token could only abandon the wait while the
+    /// for probe sessions on any platform, so a token could only abandon the wait while the
     /// probe kept running in the background. Probes are short; if you need to give up waiting,
     /// race the returned task against a delay yourself.
     /// </remarks>

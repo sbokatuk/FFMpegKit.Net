@@ -1,7 +1,7 @@
 # FFmpegKit.Net
 
-.NET bindings for the native **FFmpegKit** library, with one API across Android and iOS.
-Run FFmpeg and FFprobe commands from C#, in .NET MAUI or plain .NET for Android / iOS.
+.NET bindings for the native **FFmpegKit** library, with one API across Android, iOS and macOS.
+Run FFmpeg and FFprobe commands from C#, in .NET MAUI or plain .NET for Android / iOS / macOS.
 
 ```sh
 dotnet add package FFmpegKit.Net.Full.Maui   # MAUI apps: adds the app-builder wiring
@@ -49,30 +49,32 @@ Each package pulls in the one below it, so a single reference is enough. This re
 builds the top two - the cross-platform client and the MAUI package - and depends on the platform
 bindings as ordinary NuGet packages already published to nuget.org, pinned to an exact version in
 [Directory.Build.props](Directory.Build.props) (`FFmpegKitAndroidPackageVersion` /
-`FFmpegKitIosPackageVersion`). Drop to a platform binding directly when you need something the
-cross-platform API does not expose - the full SDK surface is there under `Ffmpegkit.Droid.*`
-(Android) and `Ffmpegkit.Ios.*` (iOS).
+`FFmpegKitIosPackageVersion` / `FFmpegKitMacPackageVersion`). Drop to a platform binding directly
+when you need something the cross-platform API does not expose - the full SDK surface is there
+under `Ffmpegkit.Droid.*` (Android), `Ffmpegkit.Ios.*` (iOS) and `Ffmpegkit.Mac.*` (macOS).
 
 ## Why there is a cross-platform layer
 
-The two bindings are faithful, independent projections of FFmpegKit's own Java and Objective-C
+The platform bindings are faithful, independent projections of FFmpegKit's own Java and Objective-C
 APIs, and they do not resemble each other in the small print: Android cancels a session through a
 static `FFmpegKit.Cancel(sessionId)`, iOS calls `session.Cancel()` on the session itself; the two
 `Statistics` and `MediaInformation` types are unrelated generated classes with a parallel but not
 identical shape (Android boxes some FFprobe numbers as Java `Long`s, iOS keeps everything as
-`NSString`). `FFmpegKit.Net` is the layer that hides that, so an app targeting both platforms is
-not the one writing the adapter between `Ffmpegkit.Droid` and `Ffmpegkit.Ios` by hand.
+`NSString`). `FFmpegKit.Net` is the layer that hides that, so an app targeting more than one platform is
+not the one writing the adapter between `Ffmpegkit.Droid`, `Ffmpegkit.Ios` and `Ffmpegkit.Mac`
+by hand.
 
 The sample is the evidence: [`samples/FFmpegKit.Net.Sample`](samples) runs the same
 `MainPage.xaml.cs` against both platforms, with no per-platform code at all.
 
 ## What is bound
 
-Both platform bindings bind FFmpegKit's own API whole - `FFmpegKit`, `FFprobeKit`,
+All three platform bindings bind FFmpegKit's own API whole - `FFmpegKit`, `FFprobeKit`,
 `FFmpegKitConfig`, `MediaInformation` and the rest - not just the entry points this repository's
 cross-platform layer happens to cover. Where the native binaries come from, how each binding
 versions itself, and how to build them from source are questions for their own repositories:
-[sbokatuk/FFmpegKit.Android][ffmpegkit-android] and [sbokatuk/FFmpegKit.iOS][ffmpegkit-ios].
+[sbokatuk/FFmpegKit.Android][ffmpegkit-android], [sbokatuk/FFmpegKit.iOS][ffmpegkit-ios] and
+[sbokatuk/FFmpegKit.Mac][ffmpegkit-mac].
 
 Android, iOS and macOS binding versions are pinned independently in
 [Directory.Build.props](Directory.Build.props) and do not track each other - see that file's
@@ -93,7 +95,7 @@ See [docs/BUILD.md](docs/BUILD.md). In short:
 build/BuildNugets.sh    # packs the cross-platform client and the MAUI package into ./artifacts
 ```
 
-Requires macOS: both packages multi-target Android and iOS together, so restoring either needs
+Requires macOS: both packages multi-target Android, iOS and (for the client) macOS together, so restoring either needs
 the iOS workload regardless of which platform's code you are exercising.
 
 ## Testing
@@ -101,8 +103,8 @@ the iOS workload regardless of which platform's code you are exercising.
 Three tiers, described in [docs/BUILD.md](docs/BUILD.md#testing): fast desktop unit tests for the
 platform-neutral logic (`dotnet test tests/FFmpegKit.Net.UnitTests`), package-shape tests over the
 packed `.nupkg` files, and on-device smoke tests that run real FFmpeg commands through the
-cross-platform API on an Android emulator and an iOS simulator - CI runs them on every pull
-request as a matrix over the net8 and net10 asset sets in parallel, the two extremes of what the
+cross-platform API on an Android emulator, an iOS simulator and a macOS host - CI runs them on
+every pull request as a matrix over the net8 and net10 asset sets in parallel, the two extremes of what the
 packages ship.
 
 ## Troubleshooting

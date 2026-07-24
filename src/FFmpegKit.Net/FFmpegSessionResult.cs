@@ -5,12 +5,13 @@ namespace Ffmpegkit.Net;
 /// binding actually ran it.
 /// </summary>
 /// <remarks>
-/// <c>Ffmpegkit.Droid.AbstractSession</c> and <c>Ffmpegkit.Ios.AbstractSession</c> are unrelated
-/// types with a parallel but not identical surface - a Java return code object on one side, an
-/// Objective-C one on the other, each with its own <c>IsValueSuccess</c>/<c>IsValueCancel</c>
-/// pair. This flattens both into one shape so calling code does not need a platform check to
+/// <c>Ffmpegkit.Droid.AbstractSession</c>, <c>Ffmpegkit.Ios.AbstractSession</c> and
+/// <c>Ffmpegkit.Mac.AbstractSession</c> are unrelated types with a parallel but not identical
+/// surface - a Java return code object on one side, Objective-C ones on the others, each with
+/// its own <c>IsValueSuccess</c>/<c>IsValueCancel</c> pair. This flattens all of them into one
+/// shape so calling code does not need a platform check to
 /// read the result of a command, including the session's console output in <see cref="Output"/>.
-/// Reach for the platform session type directly (via <c>FFmpegKitConfig.GetSession</c> on either
+/// Reach for the platform session type directly (via <c>FFmpegKitConfig.GetSession</c> on any
 /// platform, keyed by <see cref="SessionId"/>) for anything not exposed here, such as individual
 /// <c>Log</c> entries with per-line severities.
 /// </remarks>

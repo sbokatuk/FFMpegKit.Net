@@ -1,6 +1,6 @@
 namespace Ffmpegkit.Net;
 
-/// <summary>Global FFmpegKit configuration shared across both platforms.</summary>
+/// <summary>Global FFmpegKit configuration shared across all platforms.</summary>
 /// <remarks>
 /// A small slice of <c>Ffmpegkit.Droid.FFmpegKitConfig</c> / <c>Ffmpegkit.Ios.FFmpegKitConfig</c> -
 /// enough for the common case of routing FFmpeg's own log lines somewhere and bounding the memory
