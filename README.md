@@ -13,8 +13,18 @@ using Ffmpegkit.Net;
 
 var session = await FFmpegKit.ExecuteAsync("-i input.mov -c:v libx264 output.mp4");
 
-if (session.Succeeded)
-    Console.WriteLine("done");
+if (!session.Succeeded)
+    Console.WriteLine(session.Output);   // FFmpeg's console output - the error text is in here
+```
+
+Prefer exceptions? `(await FFmpegKit.ExecuteAsync(...)).EnsureSuccess()` throws an
+`FFmpegExecutionException` whose message ends with the output tail. MAUI apps can also take the
+API as an injectable service instead of calling statics:
+
+```csharp
+builder.UseMauiApp<App>().UseFFmpegKit();     // registers IFFmpegKit
+
+public MainPage(IFFmpegKit ffmpeg) => _ffmpeg = ffmpeg;   // fakeable in tests
 ```
 
 > If your app's own root namespace starts with `FFmpegKit` (say, `FFmpegKit.Net.Sample`), the bare
@@ -29,10 +39,11 @@ Every package below comes in eight variants - substitute `Full` for `Audio`, `Fu
 
 | Package | What it is | Built by |
 | --- | --- | --- |
-| `FFmpegKit.Net.<Variant>.Maui` | MAUI app-builder wiring and a FilePicker helper | this repository |
-| `FFmpegKit.Net.<Variant>` | The cross-platform client: `FFmpegKit`, `FFprobeKit`, `FFmpegKitConfig` | this repository |
+| `FFmpegKit.Net.<Variant>.Maui` | MAUI wiring: `UseFFmpegKit()`/`AddFFmpegKit()` DI registration and a FilePicker helper | this repository |
+| `FFmpegKit.Net.<Variant>` | The cross-platform client: `FFmpegKit`, `FFprobeKit`, `FFmpegKitConfig`, `IFFmpegKit` | this repository |
 | `FFmpegKit.Net.<Variant>.Android` | The raw binding to the native FFmpegKit Android SDK | [sbokatuk/FFmpegKit.Android][ffmpegkit-android] |
 | `FFmpegKit.Net.<Variant>.iOS` | The raw binding to the native FFmpegKit iOS SDK | [sbokatuk/FFmpegKit.iOS][ffmpegkit-ios] |
+| `FFmpegKit.Net.<Variant>.Mac` | The raw binding to the native FFmpegKit frameworks on macOS | [sbokatuk/FFmpegKit.Mac][ffmpegkit-mac] |
 
 Each package pulls in the one below it, so a single reference is enough. This repository only
 builds the top two - the cross-platform client and the MAUI package - and depends on the platform
@@ -93,6 +104,34 @@ packed `.nupkg` files, and on-device smoke tests that run real FFmpeg commands t
 cross-platform API on an Android emulator and an iOS simulator - CI runs them on every pull
 request as a matrix over the net8 and net10 asset sets in parallel, the two extremes of what the
 packages ship.
+
+## Troubleshooting
+
+**A command failed - where is the error?** On the result: `session.Output` is the session's
+console transcript, exactly what FFmpeg would have printed to a terminal, error text included.
+`session.EnsureSuccess()` throws with the transcript's tail in the exception message. Neither
+requires touching the platform binding.
+
+**`'ExecuteAsync' does not exist in the namespace 'FFmpegKit'`.** Your app's own root namespace
+starts with `FFmpegKit`, which shadows the class - qualify the call as
+`Ffmpegkit.Net.FFmpegKit.ExecuteAsync(...)` or alias `using FFmpeg = Ffmpegkit.Net.FFmpegKit;`.
+
+**Android: builds fine, crashes on load with `UnsatisfiedLinkError`.** The native binaries are
+64-bit only (`arm64-v8a`, `x86_64`) and need API 24+. Set
+`<SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>` and don't add 32-bit
+`RuntimeIdentifiers` - no FFmpegKit variant or version restores `armeabi-v7a`/`x86` support.
+
+**macOS: Release build crashes with `Could not find the type 'ObjCRuntime.__Registrar__'`.**
+Should not happen - the Mac binding ships a `buildTransitive` target defaulting the app to
+`Registrar=partial-static` - but if your app sets `<Registrar>` explicitly, that value wins;
+remove it or set `partial-static` yourself.
+
+**Log or progress callbacks touch the UI and crash.** Both arrive on an FFmpegKit worker
+thread. `IProgress<T>` created as `new Progress<T>(...)` on the UI thread marshals itself;
+a log delegate must marshal explicitly (`MainThread.BeginInvokeOnMainThread` in MAUI).
+
+**Files picked via FilePicker won't open on Android.** A `content://` URI is not a path - run
+it through `FFmpegKitMaui.GetInputArgumentAsync(fileResult)` first (from the `.Maui` package).
 
 ## License
 

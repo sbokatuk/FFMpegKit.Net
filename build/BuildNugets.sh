@@ -63,6 +63,24 @@ if [ -n "${4:-}" ]; then
     NATIVE_ARGS="${NATIVE_ARGS} -p:FFmpegKitMacPackageVersion=${4}"
 fi
 
+# NuGet prefers the global cache over any feed for an exact version, so re-packing the same
+# version - routine before a release, since the version only moves when FFmpeg or the binding
+# revision does - would let the Maui pass restore a PREVIOUS local pack of the client instead
+# of the one built moments earlier, and compile against a stale API. Evict this repository's
+# own ids at the version being packed. The platform bindings stay cached; those are immutable
+# nuget.org publishes.
+EFFECTIVE_VERSION="${VERSION}"
+if [ -z "${EFFECTIVE_VERSION}" ]; then
+    ffmpeg_version="$(sed -n 's:.*<FFmpegVersion>\(.*\)</FFmpegVersion>.*:\1:p' "${ROOT}/Directory.Build.props" | head -1)"
+    binding_revision="$(sed -n 's:.*<FFmpegKitBindingRevision>\(.*\)</FFmpegKitBindingRevision>.*:\1:p' "${ROOT}/Directory.Build.props" | head -1)"
+    EFFECTIVE_VERSION="${ffmpeg_version}.${binding_revision}"
+fi
+for variant in ${VARIANTS}; do
+    id_lower="$(printf 'ffmpegkit.net.%s' "${variant}" | tr '[:upper:]' '[:lower:]')"
+    rm -rf "${HOME}/.nuget/packages/${id_lower}/${EFFECTIVE_VERSION}" \
+           "${HOME}/.nuget/packages/${id_lower}.maui/${EFFECTIVE_VERSION}"
+done
+
 mkdir -p "${OUTPUT}"
 
 WORK="$(mktemp -d)"
