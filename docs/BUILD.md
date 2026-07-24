@@ -96,7 +96,7 @@ curl -s "https://azuresearch-usnc.nuget.org/query?q=packageid:ffmpegkit.net.full
 ```sh
 build/BuildNugets.sh                              # version from Directory.Build.props
 build/BuildNugets.sh 8.1.2-beta.4                  # explicit package version
-build/BuildNugets.sh 8.1.2-beta.4 8.1.2.4 8.1.2.1  # override the Android/iOS binding pins
+build/BuildNugets.sh 8.1.2-beta.4 8.1.2.5 8.1.2.2 8.1.2.2  # override the Android/iOS/Mac binding pins
 ```
 
 Requires macOS: both packages multi-target Android, iOS and (for the client) macOS together, so
@@ -138,10 +138,10 @@ uses run them locally:
 
 ```sh
 # Android: against a booted emulator or device (override the RID for arm64 hardware)
-FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8.1.2.1 net9.0-android35.0
+FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8.1.2.2 net9.0-android35.0
 
 # iOS: boots a simulator itself
-./.github/scripts/run-simulator-tests.sh Video 8.1.2.1 net9.0-ios18.0
+./.github/scripts/run-simulator-tests.sh Video 8.1.2.2 net9.0-ios18.0
 ```
 
 ## CI
