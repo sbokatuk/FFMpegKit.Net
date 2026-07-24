@@ -29,6 +29,9 @@ public static partial class FFmpegKit
     /// true; it does not throw. Cancellation asks FFmpeg to stop, and the session then completes
     /// with <see cref="FFmpegSessionResult.Cancelled"/> true rather than raising
     /// <see cref="OperationCanceledException"/> - FFmpeg may still have written a partial output file.
+    /// Chain <see cref="FFmpegSessionResult.EnsureSuccess"/> onto the awaited result when an
+    /// exception is preferred; the failure's console output is in
+    /// <see cref="FFmpegSessionResult.Output"/> either way.
     /// </remarks>
     public static partial Task<FFmpegSessionResult> ExecuteAsync(
         string command,

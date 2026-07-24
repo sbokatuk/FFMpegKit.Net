@@ -19,6 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../../src/FFmpegKit.Net/FFmpegExecutionException.cs" LinkBase="Shared" />
     <Compile Include="../../src/FFmpegKit.Net/FFmpegLogLevel.cs" LinkBase="Shared" />
     <Compile Include="../../src/FFmpegKit.Net/FFmpegProgress.cs" LinkBase="Shared" />
     <Compile Include="../../src/FFmpegKit.Net/FFmpegSessionResult.cs" LinkBase="Shared" />

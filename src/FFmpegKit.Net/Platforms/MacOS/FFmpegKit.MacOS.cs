@@ -81,7 +81,13 @@ public static partial class FFmpegKit
             session.SessionId,
             session.ReturnCode is { IsValueSuccess: true },
             session.ReturnCode is { IsValueCancel: true },
-            session.ReturnCode?.Value);
+            session.ReturnCode?.Value)
+        {
+            Command = string.IsNullOrEmpty(session.Command) ? null : session.Command,
+            Output = string.IsNullOrEmpty(session.Output) ? null : session.Output,
+            Duration = session.Duration > 0 ? TimeSpan.FromMilliseconds(session.Duration) : null,
+            FailStackTrace = string.IsNullOrEmpty(session.FailStackTrace) ? null : session.FailStackTrace,
+        };
 
     private static FFmpegProgress ToShared(MacStatistics statistics, TimeSpan? totalDuration) =>
         FFmpegProgress.From(
