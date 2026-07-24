@@ -1,7 +1,7 @@
 namespace Ffmpegkit.Net;
 
 /// <summary>
-/// Runs FFmpeg commands, with the same awaitable API on Android and iOS.
+/// Runs FFmpeg commands, with the same awaitable API on Android, iOS and macOS.
 /// </summary>
 /// <remarks>
 /// The platform bindings do not resemble each other in the small print - Android cancels a
@@ -9,11 +9,11 @@ namespace Ffmpegkit.Net;
 /// object itself, and the two <c>Statistics</c>/<c>MediaInformation</c> types are unrelated
 /// generated classes with a parallel but not identical shape. This is the layer that hides that:
 /// each member below is declared once here and implemented once per platform under
-/// <c>Platforms/Android</c> / <c>Platforms/iOS</c> (an "extended" C# partial method - the
+/// <c>Platforms/Android</c> / <c>Platforms/iOS</c> / <c>Platforms/MacOS</c> (an "extended" C# partial method - the
 /// implementing declaration lives in whichever platform half actually compiles).
 /// <para>
-/// Reach for <c>Ffmpegkit.Droid.FFmpegKit</c> (Android) or <c>Ffmpegkit.Ios.FFmpegKit</c> (iOS)
-/// directly when you need something not exposed here - both are still fully available; this
+/// Reach for <c>Ffmpegkit.Droid.FFmpegKit</c> (Android), <c>Ffmpegkit.Ios.FFmpegKit</c> (iOS) or
+/// <c>Ffmpegkit.Mac.FFmpegKit</c> (macOS) directly when you need something not exposed here - both are still fully available; this
 /// package only adds a shared layer on top; see <see cref="Net.FFmpegKitConfig"/> for the
 /// equivalent over <c>FFmpegKitConfig</c> and <see cref="Net.FFprobeKit"/> for probing.
 /// </para>
@@ -29,6 +29,9 @@ public static partial class FFmpegKit
     /// true; it does not throw. Cancellation asks FFmpeg to stop, and the session then completes
     /// with <see cref="FFmpegSessionResult.Cancelled"/> true rather than raising
     /// <see cref="OperationCanceledException"/> - FFmpeg may still have written a partial output file.
+    /// Chain <see cref="FFmpegSessionResult.EnsureSuccess"/> onto the awaited result when an
+    /// exception is preferred; the failure's console output is in
+    /// <see cref="FFmpegSessionResult.Output"/> either way.
     /// </remarks>
     public static partial Task<FFmpegSessionResult> ExecuteAsync(
         string command,

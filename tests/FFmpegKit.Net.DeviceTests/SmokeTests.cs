@@ -42,6 +42,9 @@ public static class SmokeTests
 
         Assert(result.Succeeded, $"'-version' failed with return code {result.ReturnCode?.ToString() ?? "<null>"}.");
         Assert(!result.Failed && !result.Cancelled, "Succeeded, Failed and Cancelled disagree.");
+        Assert(result.Output?.Contains("ffmpeg version") == true, "Output did not carry the version banner.");
+        Assert(result.Command?.Contains("-version") == true, $"Command was '{result.Command ?? "<null>"}'.");
+        Assert(ReferenceEquals(result.EnsureSuccess(), result), "EnsureSuccess() must return the same instance.");
         Report($"session {result.SessionId} return code {result.ReturnCode}");
     }
 
@@ -151,6 +154,21 @@ public static class SmokeTests
         Assert(result.Failed, "FFmpeg reported success for a command that should have failed.");
         Assert(!result.Succeeded && !result.Cancelled, "Succeeded, Failed and Cancelled disagree.");
         Assert(result.ReturnCode is not null and not 0, $"Return code was {result.ReturnCode?.ToString() ?? "<null>"}.");
+
+        // The reason a command failed must be readable off the result itself - dropping into the
+        // platform binding to fish out the session log is exactly what this layer is for.
+        Assert(!string.IsNullOrEmpty(result.Output), "A failed command must carry its console output.");
+
+        try
+        {
+            result.EnsureSuccess();
+            Assert(false, "EnsureSuccess() did not throw for a failed session.");
+        }
+        catch (FFmpegExecutionException exception)
+        {
+            Assert(ReferenceEquals(exception.Result, result), "The exception must carry the failed result.");
+            Assert(exception.Message.Contains($"return code {result.ReturnCode}"), "The exception message must name the return code.");
+        }
     }
 
     private static async Task ProgressIsReported(string workingDirectory)
@@ -176,6 +194,7 @@ public static class SmokeTests
             total);
 
         AssertSuccess(result, "progress encode");
+        Assert(result.Duration > TimeSpan.Zero, $"Session duration was {result.Duration?.ToString() ?? "<null>"}.");
 
         var captured = progress.Samples;
         Assert(captured.Length > 0, "No progress was reported.");
@@ -213,6 +232,16 @@ public static class SmokeTests
         var result = await task;
         Assert(result.Cancelled, $"Expected Cancelled, got Succeeded={result.Succeeded} ReturnCode={result.ReturnCode?.ToString() ?? "<null>"}.");
         Assert(!result.Failed, "A cancelled session must not read as failed.");
+
+        try
+        {
+            result.EnsureSuccess();
+            Assert(false, "EnsureSuccess() did not throw for a cancelled session.");
+        }
+        catch (OperationCanceledException)
+        {
+            // The one TAP convention the flag-based API still honours on request.
+        }
 
         Report($"cancelled session {result.SessionId}");
     }

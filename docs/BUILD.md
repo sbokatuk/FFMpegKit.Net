@@ -26,12 +26,12 @@ src/
 tests/
   FFmpegKit.Net.UnitTests/     fast desktop tests for the platform-neutral logic (parsing, progress math)
   FFmpegKit.Net.PackageTests/  inspects the packed .nupkg files for the Full variant
-  FFmpegKit.Net.DeviceTests/   on-device e2e for the cross-platform API (one project, Android + iOS heads)
+  FFmpegKit.Net.DeviceTests/   on-device e2e for the cross-platform API (one project, Android + iOS + macOS heads)
 samples/
   FFmpegKit.Net.Sample/        one MAUI sample exercising FFmpegKit.Net.Full.Maui on both platforms
 ```
 
-The solution spans .NET 8/9/10 and both platforms, so no single SDK can build all of it at once -
+The solution spans .NET 8/9/10 and three platforms, so no single SDK can build all of it at once -
 `dotnet build FFmpegKit.Net.sln` will fail on whichever band the current SDK does not own. Build
 individual projects, or use `build/BuildNugets.sh`, which handles the bands. The sample is
 deliberately **not** in the `.sln`, so `dotnet build FFmpegKit.Net.sln` never requires the MAUI
@@ -78,9 +78,9 @@ producing a package with no payload for that framework.
 
 ## External binding pins
 
-`Directory.Build.props` pins `FFmpegKitAndroidPackageVersion` and `FFmpegKitIosPackageVersion` to
-an exact version each - Android and iOS binding repositories version independently and do not
-track each other, so bumping one is not assumed to imply the other.
+`Directory.Build.props` pins `FFmpegKitAndroidPackageVersion`, `FFmpegKitIosPackageVersion` and
+`FFmpegKitMacPackageVersion` to an exact version each - the binding repositories version
+independently and do not track each other, so bumping one is not assumed to imply the other.
 
 To find the current version of a given variant, use nuget.org's search API rather than the
 flat-container versions list - the latter also returns older, unlisted releases, which can sort
@@ -96,11 +96,11 @@ curl -s "https://azuresearch-usnc.nuget.org/query?q=packageid:ffmpegkit.net.full
 ```sh
 build/BuildNugets.sh                              # version from Directory.Build.props
 build/BuildNugets.sh 8.1.2-beta.4                  # explicit package version
-build/BuildNugets.sh 8.1.2-beta.4 8.1.2.4 8.1.2.1  # override the Android/iOS binding pins
+build/BuildNugets.sh 8.1.2-beta.4 8.1.2.5 8.1.2.2 8.1.2.2  # override the Android/iOS/Mac binding pins
 ```
 
-Requires macOS: both packages multi-target Android and iOS together, so restoring either needs
-the iOS workload regardless of which platform's code you are exercising.
+Requires macOS: both packages multi-target Android, iOS and (for the client) macOS together, so
+restoring either needs the iOS workload regardless of which platform's code you are exercising.
 
 Output lands in `./artifacts`, which `NuGet.config` exposes as a package source so the tests and
 the sample app resolve the packages that were just built rather than whatever is on nuget.org.
@@ -125,7 +125,7 @@ invariant-culture parsing and the progress clamping/ETA rules without any device
 **PackageTests** are scoped to the `Full` variant - see
 [`Packages.cs`](../tests/FFmpegKit.Net.PackageTests/Packages.cs) for why repeating identical shape
 checks across all eight variants adds little. Checks: an assembly for every target framework on
-both platforms, the cross-platform and MAUI nuspecs' per-framework dependency groups pointing at
+every platform, the cross-platform and MAUI nuspecs' per-framework dependency groups pointing at
 the right external package **and version** (not just the right id - a merge that silently dropped
 the pin would still pass an id-only check), the license expression on every package matching what
 `Full` actually ships (LGPL-3.0), and the licence texts themselves being packed.
@@ -138,14 +138,15 @@ uses run them locally:
 
 ```sh
 # Android: against a booted emulator or device (override the RID for arm64 hardware)
-FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8.1.2.1 net9.0-android35.0
+FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8.1.2.2 net9.0-android35.0
 
 # iOS: boots a simulator itself
-./.github/scripts/run-simulator-tests.sh Video 8.1.2.1 net9.0-ios18.0
+./.github/scripts/run-simulator-tests.sh Video 8.1.2.2 net9.0-ios18.0
 ```
 
 ## CI
 
-Everything packs on macOS: both packages multi-target Android and iOS together, so restoring
-either needs the iOS workload regardless of which platform's code is being exercised - there is no
-Android-only, Linux-runner leg the way there is in the two binding repositories.
+Everything packs on macOS: both packages multi-target Android, iOS and (for the client) macOS
+together, so restoring either needs the iOS workload regardless of which platform's code is being
+exercised - there is no Android-only, Linux-runner leg the way there is in the Android binding
+repository.

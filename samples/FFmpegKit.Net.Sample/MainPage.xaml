@@ -27,6 +27,13 @@
                 Clicked="OnConvertClicked"
                 HorizontalOptions="Fill" />
 
+            <Button
+                x:Name="CancelBtn"
+                Text="Cancel"
+                Clicked="OnCancelClicked"
+                IsEnabled="False"
+                HorizontalOptions="Fill" />
+
             <ActivityIndicator
                 x:Name="Spinner"
                 IsRunning="False"

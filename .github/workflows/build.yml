@@ -249,6 +249,28 @@ jobs:
           name: nuget-packages
           path: artifacts
 
+      - name: Free disk space for the emulator
+        run: |
+          # The AVD's userdata partition needs ~7.2 GB free, and this job has already installed
+          # three .NET SDK bands, three Android workloads, three platform SDKs, a system image
+          # and the packed packages. Runs have died here with
+          #
+          #     FATAL | Not enough space to create userdata partition.
+          #             Available: 5666.53 MB, need 7372.80 MB.
+          #
+          # which fails as an emulator boot timeout several minutes later, long after the real
+          # cause scrolled past. None of the following is used by this job: no native code is
+          # compiled (the .aar ships prebuilt .so files), so the NDK alone is ~5 GB of dead
+          # weight. Deliberately NOT touching /usr/share/dotnet or the rest of the Android SDK.
+          echo "before: $(df -h --output=avail / | tail -1) available"
+          sudo rm -rf /usr/local/lib/android/sdk/ndk || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/share/powershell || true
+          sudo rm -rf /usr/local/lib/node_modules || true
+          docker image prune --all --force || true
+          echo "after:  $(df -h --output=avail / | tail -1) available"
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \

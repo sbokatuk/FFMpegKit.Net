@@ -1,7 +1,7 @@
 namespace Ffmpegkit.Net;
 
 /// <summary>
-/// Parsed FFprobe output for one media file, with the same typed accessors on both platforms.
+/// Parsed FFprobe output for one media file, with the same typed accessors on every platform.
 /// </summary>
 /// <remarks>
 /// FFprobe reports numbers as invariant-format strings (Android also boxes some as Java

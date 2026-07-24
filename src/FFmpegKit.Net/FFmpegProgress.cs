@@ -34,12 +34,12 @@ public sealed record FFmpegProgress(
     public TimeSpan? EstimatedTimeRemaining { get; init; }
 
     /// <summary>
-    /// Builds a sample from the raw numbers both platforms' <c>Statistics</c> type reports.
+    /// Builds a sample from the raw numbers each platform's <c>Statistics</c> type reports.
     /// </summary>
     /// <remarks>
     /// Shared so the clamping and null-handling rules - a negative pre-first-frame
     /// <paramref name="timeMs"/>, a zero bitrate before FFmpeg has enough output to measure one -
-    /// are applied identically on both platforms, even though each hands the raw numbers over
+    /// are applied identically on every platform, even though each hands the raw numbers over
     /// through a differently-typed <c>Statistics</c> object.
     /// </remarks>
     internal static FFmpegProgress From(

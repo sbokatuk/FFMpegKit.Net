@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    The cross-platform API: one FFmpegKit.Execute/ExecuteAsync surface shared by Android and iOS,
+    The cross-platform API: one FFmpegKit.Execute/ExecuteAsync surface shared by Android, iOS and macOS,
     instead of every consumer writing the adapter between Ffmpegkit.Droid and Ffmpegkit.Ios by
     hand. See FFmpegKit.cs, FFprobeKit.cs and FFmpegKitConfig.cs for what it covers, and the
     Platforms/Android and Platforms/iOS folders for the two implementations.
 
-    The Android and iOS bindings themselves are NOT built in this repository - they are
+    The Android, iOS and macOS bindings themselves are NOT built in this repository - they are
     FFmpegKit.Net.<Variant>.Android / .iOS, published to nuget.org from sbokatuk/FFmpegKit.Android
     and sbokatuk/FFmpegKit.iOS respectively. This project only depends on them, pinned to an exact
     version in Directory.Build.props (FFmpegKitAndroidPackageVersion / FFmpegKitIosPackageVersion).
@@ -81,7 +81,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>FFmpegKit.Net.$(FFmpegKitBuildType)</PackageId>
     <Title>Cross-platform .NET client for the native FFmpegKit $(FFmpegKitBuildType) SDK.</Title>
-    <Description>One API over the FFmpegKit bindings for Android and iOS: run FFmpeg/FFprobe commands with awaitable calls, typed media information and progress reporting, instead of writing a per-platform adapter over Ffmpegkit.Droid and Ffmpegkit.Ios by hand. Pulls in the platform binding that matches whichever target framework you build. For .NET MAUI apps, FFmpegKit.Net.Maui adds the app-builder wiring.</Description>
+    <Description>One API over the FFmpegKit bindings for Android, iOS and macOS: run FFmpeg/FFprobe commands with awaitable calls, typed media information, progress reporting, failure output on the result and an injectable IFFmpegKit, instead of writing a per-platform adapter over Ffmpegkit.Droid, Ffmpegkit.Ios and Ffmpegkit.Mac by hand. Pulls in the platform binding that matches whichever target framework you build. For .NET MAUI apps, FFmpegKit.Net.Maui adds the app-builder wiring.</Description>
     <PackageLicenseExpression>MIT AND $(FFmpegKitNativeLicense)</PackageLicenseExpression>
     <PackageTags>ffmpeg;ffmpegkit;$(FFmpegKitVariantName);video;audio;transcode;SDK;MAUI;Android;iOS;Binding</PackageTags>
     <PackageIcon>icon.png</PackageIcon>

@@ -35,11 +35,16 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.2</SupportedOSPlatformVersion>
 
     <!--
-      Which build of the FFmpegKit packages to demo. Defaults to FFmpegVersion from
-      Directory.Build.props, so it tracks the repository automatically; pass
-      -p:FFmpegKitVersion=8.1.2-beta.4 to try a specific build.
+      Which build of the FFmpegKit packages to demo. Defaults to VersionPrefix from
+      Directory.Build.props - the full four-part version including the binding revision - so it
+      tracks the repository automatically; pass -p:FFmpegKitVersion=8.1.2-beta.4 to try a
+      specific build.
+
+      Not the three-part FFmpegVersion: "8.1.2" is a floor, not an exact version, and NuGet's
+      lowest-match resolution would then prefer an older published revision (8.1.2.1) over the
+      local pack (8.1.2.2), silently demoing a stale package from nuget.org.
     -->
-    <FFmpegKitVersion Condition=" '$(FFmpegKitVersion)' == '' ">$(FFmpegVersion)</FFmpegKitVersion>
+    <FFmpegKitVersion Condition=" '$(FFmpegKitVersion)' == '' ">$(VersionPrefix)</FFmpegKitVersion>
   </PropertyGroup>
 
   <ItemGroup>
