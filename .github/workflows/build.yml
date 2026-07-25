@@ -162,30 +162,15 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      - name: Install Android/iOS/macOS/MAUI workloads
-        run: dotnet workload install android ios macos maui
-
-      # For the sample build below - the workload alone stops at XA5207 without the platform.
-      - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platforms;android-35'
-
+      # No MAUI/platform workloads here any more: the unit and package tests are plain net9 and
+      # inspect the packed .nupkg files, and the sample build that needed them moved to its own
+      # build-samples matrix (below), which exercises the net8 and net10 extremes rather than the
+      # single net9 pair this step used to.
       - name: Run unit tests
         run: dotnet test tests/FFmpegKit.Net.UnitTests --logger 'trx;LogFileName=unit-tests.trx'
 
       - name: Run package tests
         run: dotnet test tests/FFmpegKit.Net.PackageTests --logger 'trx;LogFileName=package-tests.trx'
-
-      # The sample consumes FFmpegKit.Net.Full.Maui through a PackageReference exactly as a user
-      # would, so it is what catches an API that no longer matches what the README documents -
-      # nothing else here builds against the packed packages the way an actual consumer does.
-      # Build only, both target frameworks: proving it links is the point, not running it.
-      - name: Build the sample against the packed packages
-        run: |
-          dotnet build samples/FFmpegKit.Net.Sample/FFmpegKit.Net.Sample.csproj \
-            --configuration Release \
-            -p:FFmpegKitVersion="${{ inputs.version }}"
 
       - name: Upload test results
         if: always()
@@ -195,6 +180,98 @@ jobs:
           path: '**/*.trx'
           if-no-files-found: ignore
           retention-days: 7
+
+  build-samples:
+    name: sample build (${{ matrix.tfm }})
+    # Release iOS AOT statically links the native FFmpeg per framework and is slow; the legs run
+    # concurrently, so wall-clock is one leg. Android legs are much faster on Linux.
+    timeout-minutes: 90
+    needs: pack
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # fail-fast off: proving which heads are consumable is the point, and net8-vs-net10 or
+      # android-vs-ios failures have very different causes - a partial result is still a result.
+      fail-fast: false
+      matrix:
+        # The net8 and net10 extremes on each platform - the whole point of the cross-platform
+        # layer is that one MAUI sample drives both, so both are exercised on the oldest and
+        # newest asset sets, in Release, where the AOT/trimmer/R8 link runs. The Android legs go on
+        # a Linux runner (the sample drops its iOS head there); the iOS legs need macOS + Xcode.
+        include:
+          - band: net8
+            platform: android
+            os: ubuntu-latest
+            tfm: net8.0-android34.0
+          - band: net10
+            platform: android
+            os: ubuntu-latest
+            tfm: net10.0-android36.0
+          - band: net8
+            platform: ios
+            os: macos-15
+            tfm: net8.0-ios18.0
+            build-args: -p:RuntimeIdentifier=iossimulator-arm64
+          - band: net10
+            platform: ios
+            os: macos-15
+            tfm: net10.0-ios26.0
+            build-args: -p:RuntimeIdentifier=iossimulator-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        if: matrix.platform == 'ios'
+        uses: ./.github/actions/select-xcode
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Pin the ${{ matrix.band }} SDK band and install workloads
+        id: band
+        run: |
+          # The sample targets one framework per platform per band (SampleSdkBand), pinned through
+          # a scratch global.json since the repository global.json is .NET 9. `dotnet build -f`
+          # still restores every framework the band lists, so an iOS leg on macOS needs both the
+          # iOS and Android workloads; an Android leg on Linux (iOS head dropped) needs only
+          # Android.
+          major="$(printf '%s' '${{ matrix.band }}' | sed 's/net//')"
+          sdk="$(dotnet --list-sdks | grep "^${major}\." | tail -1 | cut -d' ' -f1)"
+          dir="${RUNNER_TEMP}/band-${{ matrix.band }}-${{ matrix.platform }}"
+          mkdir -p "${dir}"
+          printf '{ "sdk": { "version": "%s", "rollForward": "latestFeature" } }\n' "${sdk}" > "${dir}/global.json"
+          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
+          if [ '${{ matrix.platform }}' = 'ios' ]; then
+            ( cd "${dir}" && dotnet workload install maui-ios maui-android )
+          else
+            ( cd "${dir}" && dotnet workload install maui-android )
+          fi
+
+      - name: Set up the Android SDK platforms
+        if: matrix.platform == 'android'
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 platforms;android-36'
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      - name: Build the ${{ matrix.tfm }} sample against the packed packages
+        run: |
+          # The sample consumes FFmpegKit.Net.Full.Maui through a PackageReference exactly as a
+          # consumer would, so it catches an API that no longer matches the README - nothing else
+          # here builds against the packed packages the way an actual app does.
+          ( cd "${{ steps.band.outputs.dir }}" && dotnet build "${GITHUB_WORKSPACE}/samples/FFmpegKit.Net.Sample/FFmpegKit.Net.Sample.csproj" \
+              --configuration Release -f "${{ matrix.tfm }}" ${{ matrix.build-args }} \
+              -p:SampleSdkBand="${{ matrix.band }}" \
+              -p:FFmpegKitVersion="${{ inputs.version }}" )
 
   # The device tests consume the packed FFmpegKit.Net.<Variant> package - including its pinned
   # dependency on the external platform binding from nuget.org - and drive real FFmpeg commands
