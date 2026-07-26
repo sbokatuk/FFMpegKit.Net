@@ -2,13 +2,22 @@
 
   <PropertyGroup>
     <!--
-      Both platforms the .NET 9 SDK band can build in one go, so the sample proves
-      FFmpegKit.Net.Full.Maui resolves and runs the same code on Android and iOS - which is the
-      entire point of the cross-platform layer. net10.0-* is deliberately left out: it would mean
-      a second SDK and workload set to compile a sample that exercises the same API the device
-      tests already run against net10 for.
+      One target framework per platform per SDK band, selected by SampleSdkBand, so the CI sample
+      matrix builds the net8 and net10 extremes on each platform, each on its own band. Unset
+      locally it is the net9 dev band, so `dotnet build` just works. On Linux the iOS head is
+      dropped: `dotnet build -f <android tfm>` still restores every listed framework, and the iOS
+      workload does not exist on Linux (NETSDK1178), so the Android matrix leg can run on a cheap
+      Linux runner.
     -->
-    <TargetFrameworks>net9.0-android35.0;net9.0-ios18.0</TargetFrameworks>
+    <SampleSdkBand Condition=" '$(SampleSdkBand)' == '' ">net9</SampleSdkBand>
+    <SampleAndroidTfm Condition=" '$(SampleSdkBand)' == 'net8' ">net8.0-android34.0</SampleAndroidTfm>
+    <SampleAndroidTfm Condition=" '$(SampleSdkBand)' == 'net9' ">net9.0-android35.0</SampleAndroidTfm>
+    <SampleAndroidTfm Condition=" '$(SampleSdkBand)' == 'net10' ">net10.0-android36.0</SampleAndroidTfm>
+    <SampleIosTfm Condition=" '$(SampleSdkBand)' == 'net8' ">net8.0-ios18.0</SampleIosTfm>
+    <SampleIosTfm Condition=" '$(SampleSdkBand)' == 'net9' ">net9.0-ios18.0</SampleIosTfm>
+    <SampleIosTfm Condition=" '$(SampleSdkBand)' == 'net10' ">net10.0-ios26.0</SampleIosTfm>
+    <TargetFrameworks>$(SampleAndroidTfm);$(SampleIosTfm)</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(SampleAndroidTfm)</TargetFrameworks>
 
     <OutputType>Exe</OutputType>
     <RootNamespace>FFmpegKit.Net.Sample</RootNamespace>
@@ -56,19 +65,37 @@
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!--
-      Microsoft.Maui.Controls pinned above the workload's own bundled 9.0.0: both UseMaui=true's
-      implicit reference and an explicit $(MauiVersion) one resolve to exactly that version, which
-      is older than what CommunityToolkit.Maui 11 requires (NU1605 package downgrade error).
-      Controls itself is an ordinary NuGet package independent of which workload pack version is
-      installed, so pinning it higher here restores cleanly without reinstalling the workload.
-    -->
+  <!--
+    CommunityToolkit.Maui and its MediaElement (the before/after video preview) have no single
+    version spanning net8 and net10, so they - and the Microsoft.Maui.Controls version each one
+    requires, and a matching Microsoft.Extensions.Logging.Debug - are selected per band.
+    Controls is pinned to the highest floor anything in the graph declares: the workload's own
+    bundled Controls is older, so relying on $(MauiVersion) trips NU1605, and Controls is an
+    ordinary NuGet package independent of the installed workload pack, so pinning it restores
+    cleanly. On net8 that floor is FFmpegKit.Net.Maui's own 8.0.100 rather than the toolkit's
+    8.0.71 - see FFmpegKitMauiControlsVersion in src/FFmpegKit.Net.Maui/FFmpegKit.Net.Maui.csproj;
+    a sample pinned under the package it consumes fails restore with NU1605.
+  -->
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net8.0'))">
+    <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
+    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="4.1.2" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.100" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+  </ItemGroup>
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net9.0'))">
     <PackageReference Include="CommunityToolkit.Maui" Version="11.0.0" />
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="6.0.1" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.30" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net10.0'))">
+    <PackageReference Include="CommunityToolkit.Maui" Version="15.0.0" />
+    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+  </ItemGroup>
 
+  <ItemGroup>
     <!--
       The locally built package, resolved from ./artifacts via the local-artifacts source in the
       repository's NuGet.config. Run build/BuildNugets.sh first - this deliberately does not come
