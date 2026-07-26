@@ -69,15 +69,17 @@
     CommunityToolkit.Maui and its MediaElement (the before/after video preview) have no single
     version spanning net8 and net10, so they - and the Microsoft.Maui.Controls version each one
     requires, and a matching Microsoft.Extensions.Logging.Debug - are selected per band.
-    Controls is pinned to the exact floor the toolkit declares (8.0.71 / 9.0.30 / 10.0.60): the
-    workload's own bundled Controls is older, so relying on $(MauiVersion) trips NU1605, and
-    Controls is an ordinary NuGet package independent of the installed workload pack, so pinning
-    it restores cleanly.
+    Controls is pinned to the highest floor anything in the graph declares: the workload's own
+    bundled Controls is older, so relying on $(MauiVersion) trips NU1605, and Controls is an
+    ordinary NuGet package independent of the installed workload pack, so pinning it restores
+    cleanly. On net8 that floor is FFmpegKit.Net.Maui's own 8.0.100 rather than the toolkit's
+    8.0.71 - see FFmpegKitMauiControlsVersion in src/FFmpegKit.Net.Maui/FFmpegKit.Net.Maui.csproj;
+    a sample pinned under the package it consumes fails restore with NU1605.
   -->
   <ItemGroup Condition="$(TargetFramework.StartsWith('net8.0'))">
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="4.1.2" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.71" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.100" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
   </ItemGroup>
   <ItemGroup Condition="$(TargetFramework.StartsWith('net9.0'))">
