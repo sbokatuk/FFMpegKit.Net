@@ -1,6 +1,11 @@
 name: release
 
 on:
+  # Dispatched as well as pushed to: auto-release.yml creates the tag with GITHUB_TOKEN when a
+  # release note is merged, and a tag pushed with that token deliberately does not trigger
+  # `on: push: tags`. workflow_dispatch is documented as an exception that always creates a run.
+  # Dispatched at the tag's ref, so github.ref_name below is the tag either way.
+  workflow_dispatch:
   push:
     tags: ['v*']
 

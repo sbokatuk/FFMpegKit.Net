@@ -1,0 +1,124 @@
+name: auto-release
+
+# Merging a release note is the release.
+#
+# A pull request that adds docs/release-notes/<version>.md (2.34.1.4.md)
+# is stating that the merge it belongs to is a release: the note is hand-written, one per
+# version, and nobody writes one by accident.
+# So merging it tags the merge commit and starts the ordinary release run. Nothing else about the
+# release path changes — the tag is a real tag at a real commit, release.yml resolves the version
+# from it exactly as it does for a hand-pushed tag, and the guard job there still proves the
+# commit is on the default branch before anything is published.
+#
+# Triggered on the push to master rather than on `pull_request: closed`, for two reasons: a push
+# to the default branch carries a full-permission token whatever the pull request's origin was
+# (a fork pull request's token is read-only and could not push the tag), and it sees the merge
+# identically whether it arrived as a merge commit, a squash or a rebase.
+
+on:
+  push:
+    branches: ['master']
+    paths:
+      - 'docs/release-notes/**'
+
+concurrency:
+  group: auto-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  # contents: write pushes the tag. actions: write dispatches release.yml, and that dispatch is
+  # not a stylistic choice: a tag pushed with GITHUB_TOKEN deliberately does not trigger
+  # `on: push: tags`, so release.yml would sit there and never start. workflow_dispatch is
+  # documented as an exception which always creates a run, which is why release.yml carries a
+  # workflow_dispatch trigger alongside its tag trigger.
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    name: tag and release the notes added here
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history, so the diff below can reach the previous commit and so
+          # `git rev-parse refs/tags/...` can see tags that already exist.
+          fetch-depth: 0
+
+      - name: Tag every release note this push added, and start its release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          # A brand-new branch reports an all-zero "before" and there is nothing to diff against.
+          case "${BEFORE}" in
+            0000000000000000000000000000000000000000|'')
+              echo "no previous commit to diff against; nothing to do"
+              exit 0
+              ;;
+          esac
+
+          # --diff-filter=A: added, not modified. Editing an existing note is a correction to a
+          # release that already happened, and must not tag anything.
+          added="$(git diff --name-status --diff-filter=A "${BEFORE}" "${GITHUB_SHA}" \
+                     -- 'docs/release-notes/*.md' | cut -f2)"
+
+          if [ -z "${added}" ]; then
+            echo "no release notes added in this push; nothing to do"
+            exit 0
+          fi
+
+          # An annotated tag needs a tagger, and a runner has no git identity configured — without
+          # this, `git tag -a` fails with "Committer identity unknown".
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          count=0
+          while IFS= read -r file; do
+            [ -n "${file}" ] || continue
+            base="$(basename "${file}" .md)"
+
+            # README.md documents the folder in several of these repositories.
+            if [ "${base}" = 'README' ]; then
+              continue
+            fi
+
+            tag="v${base}"
+
+            # Four-part versions only. release.yml's own version job also accepts three parts,
+            # but every release tag this repository has ever carried is four-part, and the
+            # three-part notes that exist are series overviews rather than releases — tagging one
+            # of those would publish something nobody asked for. A genuine three-part release can
+            # still be tagged by hand; only this automatic path is strict.
+            if ! printf '%s' "${tag}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+              echo "::warning::${file} does not name a release this repository publishes (would be '${tag}'); skipping"
+              continue
+            fi
+
+            if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+              echo "${tag} already exists; skipping"
+              continue
+            fi
+
+            echo "==> tagging ${GITHUB_SHA} as ${tag} for ${file}"
+            git tag -a "${tag}" "${GITHUB_SHA}" -m "Release ${tag}"
+            git push origin "${tag}"
+
+            # Dispatched at the tag's own ref, so github.ref_name inside release.yml is the tag
+            # and its version/track resolution, release-notes lookup and changelog range all
+            # behave exactly as they do for a hand-pushed tag.
+            gh workflow run release.yml --ref "${tag}"
+            echo "==> dispatched release.yml at ${tag}"
+
+            {
+              echo "- \`${tag}\` tagged from ${file} and released"
+            } >> "$GITHUB_STEP_SUMMARY"
+            count=$((count + 1))
+          done <<< "${added}"
+
+          if [ "${count}" -eq 0 ]; then
+            echo "nothing tagged" >> "$GITHUB_STEP_SUMMARY"
+          fi
