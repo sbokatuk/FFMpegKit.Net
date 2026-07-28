@@ -14,6 +14,16 @@ name: build
 on:
   workflow_call:
     inputs:
+      verify:
+        description: >
+          Whether to run the verification jobs — package validation, the sample builds, the
+          Release link checks and the e2e suites. Pull requests leave it at true, and are the only
+          place any of this runs. Releases pass false: the tagged commit was already verified on
+          its pull request, so a tag packs and publishes and nothing more. The gate is the same
+          input, with the same name and the same meaning, in every repository.
+        required: false
+        default: true
+        type: boolean
       version:
         description: NuGet version to stamp on every package.
         required: true
@@ -146,6 +156,7 @@ jobs:
 
   validate:
     name: validate packages
+    if: ${{ inputs.verify }}
     needs: pack
     runs-on: macos-latest
     steps:
@@ -183,6 +194,7 @@ jobs:
 
   build-samples:
     name: sample build (${{ matrix.tfm }})
+    if: ${{ inputs.verify }}
     # Release iOS AOT statically links the native FFmpeg per framework and is slow; the legs run
     # concurrently, so wall-clock is one leg. Android legs are much faster on Linux.
     timeout-minutes: 90
@@ -279,6 +291,7 @@ jobs:
   # the bindings; this proves the unified surface over them.
   e2e-android:
     name: emulator smoke test (${{ matrix.target-framework }})
+    if: ${{ inputs.verify }}
     timeout-minutes: 60
     needs: pack
     runs-on: ubuntu-latest
@@ -380,6 +393,7 @@ jobs:
 
   e2e-ios:
     name: simulator smoke test (${{ matrix.target-framework }})
+    if: ${{ inputs.verify }}
     timeout-minutes: 45
     needs: pack
     runs-on: macos-15
@@ -430,6 +444,7 @@ jobs:
 
   e2e-mac:
     name: macOS host smoke test (${{ matrix.target-framework }})
+    if: ${{ inputs.verify }}
     timeout-minutes: 45
     needs: pack
     runs-on: macos-15
