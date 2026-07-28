@@ -123,10 +123,16 @@ starts with `FFmpegKit`, which shadows the class - qualify the call as
 `<SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>` and don't add 32-bit
 `RuntimeIdentifiers` - no FFmpegKit variant or version restores `armeabi-v7a`/`x86` support.
 
-**macOS: Release build crashes with `Could not find the type 'ObjCRuntime.__Registrar__'`.**
-Should not happen - the Mac binding ships a `buildTransitive` target defaulting the app to
-`Registrar=partial-static` - but if your app sets `<Registrar>` explicitly, that value wins;
-remove it or set `partial-static` yourself.
+**iOS or macOS: crashes on a real device with `Could not find the type 'ObjCRuntime.__Registrar__'`.**
+Should not happen - the platform bindings ship a `buildTransitive` target defaulting the app to a
+registrar that avoids it (`Registrar=dynamic` on iOS, `partial-static` on macOS), and it reaches
+your app transitively through `FFmpegKit.Net.<Variant>.Maui`. It is the .NET SDK issue
+[dotnet/macios#22071](https://github.com/dotnet/macios/issues/22071), and the iOS simulator does
+not reproduce it, so it can pass simulator tests and still crash on a phone. If your app sets
+`<Registrar>` explicitly, that value wins - and note that **NativeAOT** (`PublishAot=true`)
+requires the managed static registrar, so a NativeAOT app must choose its own `Registrar` and this
+crash is unfixed there until the upstream issue is. `Registrar=static` avoids it and is lighter
+than `dynamic`.
 
 **Log or progress callbacks touch the UI and crash.** Both arrive on an FFmpegKit worker
 thread. `IProgress<T>` created as `new Progress<T>(...)` on the UI thread marshals itself;

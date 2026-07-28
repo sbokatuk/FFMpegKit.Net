@@ -25,7 +25,7 @@ public static class Packages
     /// rather than discovered at restore time by a consumer.
     /// </summary>
     public const string AndroidPackageVersion = "8.1.2.5";
-    public const string IosPackageVersion = "8.1.2.2";
+    public const string IosPackageVersion = "8.1.2.3";
     public const string MacPackageVersion = "8.1.2.2";
 
     /// <summary>Target frameworks the cross-platform client must carry.</summary>

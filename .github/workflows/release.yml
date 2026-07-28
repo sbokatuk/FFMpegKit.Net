@@ -1,6 +1,11 @@
 name: release
 
 on:
+  # Dispatched as well as pushed to: auto-release.yml creates the tag with GITHUB_TOKEN when a
+  # release note is merged, and a tag pushed with that token deliberately does not trigger
+  # `on: push: tags`. workflow_dispatch is documented as an exception that always creates a run.
+  # Dispatched at the tag's ref, so github.ref_name below is the tag either way.
+  workflow_dispatch:
   push:
     tags: ['v*']
 
@@ -12,6 +17,37 @@ permissions:
   contents: read
 
 jobs:
+  # The release path packs and publishes without re-running validate/sample/e2e, on the grounds
+  # that the tagged commit already went through them on its pull request. That reasoning only
+  # holds if the commit is genuinely on the default branch — a tag cut from an unmerged branch,
+  # or from a commit force-pushed away since, would ship having been verified by nothing. Two
+  # cheap ubuntu minutes to make the assumption explicit rather than implicit.
+  guard:
+    name: verify the tag is on the default branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse a tag that never went through a pull request
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # A tag push checks out the tag, and the default branch's ref is not necessarily among
+          # the refs fetched with it, so ask for it by name before testing ancestry.
+          git fetch --no-tags --quiet origin \
+            "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}"
+
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" "origin/${DEFAULT_BRANCH}"; then
+            echo "::error::${GITHUB_REF_NAME} points at ${GITHUB_SHA}, which is not an ancestor of ${DEFAULT_BRANCH}. Releases skip the test suites because the tagged commit was verified on its pull request; this commit was not. Merge it first, then re-tag."
+            exit 1
+          fi
+
+          echo "${GITHUB_REF_NAME} -> ${GITHUB_SHA} is on ${DEFAULT_BRANCH}" >> "$GITHUB_STEP_SUMMARY"
+
   version:
     name: resolve release version
     runs-on: ubuntu-latest
@@ -44,10 +80,13 @@ jobs:
 
   build:
     name: build
-    needs: version
+    needs: [guard, version]
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.version }}
+      # Verification already happened on this commit's pull request, and the guard job above
+      # proved the tag points at that commit. A release packs and publishes, nothing more.
+      verify: false
 
   publish:
     name: publish to nuget.org and create release

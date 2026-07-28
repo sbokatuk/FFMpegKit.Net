@@ -27,14 +27,14 @@
       not change what this repository packs until this pin is bumped deliberately.
     -->
     <FFmpegKitAndroidPackageVersion>8.1.2.5</FFmpegKitAndroidPackageVersion>
-    <FFmpegKitIosPackageVersion>8.1.2.2</FFmpegKitIosPackageVersion>
+    <FFmpegKitIosPackageVersion>8.1.2.3</FFmpegKitIosPackageVersion>
     <FFmpegKitMacPackageVersion>8.1.2.2</FFmpegKitMacPackageVersion>
 
     <!--
       Belongs to this repository, not to either external binding. Increments whenever the
       cross-platform layer or the MAUI package changes while FFmpegVersion stays put.
     -->
-    <FFmpegKitBindingRevision>2</FFmpegKitBindingRevision>
+    <FFmpegKitBindingRevision>3</FFmpegKitBindingRevision>
     <VersionPrefix>$(FFmpegVersion).$(FFmpegKitBindingRevision)</VersionPrefix>
 
     <!--
