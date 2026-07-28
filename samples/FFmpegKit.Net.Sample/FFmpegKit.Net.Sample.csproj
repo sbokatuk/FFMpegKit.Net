@@ -44,6 +44,17 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.2</SupportedOSPlatformVersion>
 
     <!--
+      The other half of the same story. FFmpegKit's Android payload carries arm64-v8a and x86_64
+      only, but the .NET Android SDK's default runtime identifier list still includes the 32-bit
+      android-arm and android-x86 - so the default build packages ABIs with no libffmpegkit.so in
+      them, and a 32-bit device installs the app and crashes on first use. FFMPEGKIT002, raised by
+      the .targets the Android package ships, says exactly this at build time.
+      Set rather than suppressed: this sample is what a consumer copies, and 64-bit-only is what
+      a consuming app should ship anyway (Play Store has required a 64-bit slice since 2019).
+    -->
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm64;android-x64</RuntimeIdentifiers>
+
+    <!--
       Which build of the FFmpegKit packages to demo. Defaults to VersionPrefix from
       Directory.Build.props - the full four-part version including the binding revision - so it
       tracks the repository automatically; pass -p:FFmpegKitVersion=8.1.2-beta.4 to try a
