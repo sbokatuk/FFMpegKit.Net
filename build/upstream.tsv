@@ -1,0 +1,25 @@
+# What build/check-upstream.sh watches, and the single source of truth for it.
+#
+# The script (shared verbatim across every repository in these families) knows how to query each
+# ecosystem but nothing about which components matter here. This repository binds nothing native:
+# what it pins are the platform binding packages published from the sibling repositories, by exact
+# version, so a platform release that this umbrella has not been re-pinned behind is invisible -
+# consumers of the umbrella keep resolving the older binding and nothing says so.
+#
+# That is what the `nuget` rows below watch. The check is deliberately asymmetric: a pin BEHIND
+# nuget.org is a finding (re-pin this repository), a pin AHEAD of it is the normal mid-flight
+# state of a release train (platform repositories publish first) and is only logged.
+#
+# Columns are single-tab-separated.
+#   group    reporting group - one GitHub issue per group, titled with this text
+#   label    how the component is named inside the issue
+#   kind     cocoapods | maven | github-release | github-tag | nuget
+#   pin      the MSBuild property in Directory.Build.props holding the pinned version
+#   locator  kind-specific: pod name, groupId:artifactId[:packaging][@repo], owner/repo, or the
+#            NuGet package id
+#   confirm  download URL template with {version}, or "-" to derive it from the locator
+#
+# group	label	kind	pin	locator	confirm
+Platform packages	FFmpegKit.Net.*.Android	nuget	FFmpegKitAndroidPackageVersion	FFmpegKit.Net.Full.Android	-
+Platform packages	FFmpegKit.Net.*.iOS	nuget	FFmpegKitIosPackageVersion	FFmpegKit.Net.Full.iOS	-
+Platform packages	FFmpegKit.Net.*.Mac	nuget	FFmpegKitMacPackageVersion	FFmpegKit.Net.Full.Mac	-
