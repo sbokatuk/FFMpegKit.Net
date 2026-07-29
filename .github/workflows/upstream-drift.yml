@@ -1,0 +1,132 @@
+name: upstream drift
+
+# The native SDK pins in Directory.Build.props are updated by hand, and nothing else watches the
+# vendors. Without this, a year of upstream releases goes unnoticed - which is not hypothetical:
+# this repository's pins have sat several releases behind before.
+#
+# What gets watched lives in build/upstream.tsv; how it is checked lives in
+# build/check-upstream.sh, which is runnable locally (`DRIFT_DIR=/tmp/d ./build/check-upstream.sh`)
+# so the same answer is available before a release without waiting for the schedule.
+#
+# The check is deliberately two-stage - find a candidate in the vendor's index, then confirm the
+# artifact actually downloads - because vendors routinely index a version whose binaries are not
+# published yet. See the comments in check-upstream.sh for the case that motivated it.
+#
+# Reports one issue per group, so the title says where the change is and unrelated products are
+# tracked separately rather than piling into one thread.
+#
+# Runs daily. That only stays readable because a standing drift is silent: every report carries a
+# fingerprint of the drift it describes, so an unchanged fingerprint posts nothing, a changed one
+# adds a comment, and drift going away closes the issue.
+
+on:
+  schedule:
+    - cron: '39 6 * * *' # Daily, 06:39 UTC — off the full hour to dodge the cron rush.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # A manual run while the nightly one is mid-flight would race on the same issues.
+  group: upstream-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: compare pins to upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # Named here rather than in the script so each repository says its own thing without the
+      # shared checker growing repository-specific prose.
+      REPIN_HINT: 'Pins live in `Directory.Build.props`; `./build/BumpNativeVersion.sh <version>` does the mechanical part.'
+    steps:
+      - uses: actions/checkout@v4
+
+      # DRIFT_DIR is repeated per step rather than hoisted to the job: the `runner` context does
+      # not exist when job-level env is evaluated, and using it there fails the whole workflow to
+      # parse ("Unrecognized named-value: 'runner'") rather than failing at run time.
+      - name: Compare
+        env:
+          DRIFT_DIR: ${{ runner.temp }}/drift
+        run: ./build/check-upstream.sh
+
+      - name: Report per group
+        env:
+          DRIFT_DIR: ${{ runner.temp }}/drift
+        run: |
+          set -euo pipefail
+
+          today="$(date -u +%Y-%m-%d)"
+          resolved='<!-- upstream-drift: resolved -->'
+
+          # The search is a phrase query, so it returns every group's issue; the exact title picks
+          # the one that belongs to this group. Newest first, and the caller takes the first line —
+          # there should only ever be one open per group.
+          find_issue() {
+            gh issue list --state "$1" --limit 50 \
+              --search 'in:title "Upstream drift" sort:created-desc' \
+              --json number,title --jq '.[] | "\(.number)\t\(.title)"' \
+              | awk -F'\t' -v title="$2" '$2 == title { print $1 }'
+          }
+
+          echo '## Upstream drift' >> "$GITHUB_STEP_SUMMARY"
+
+          # Every group is visited, drift or not: a group whose drift is gone closes its issue,
+          # which is what keeps a daily run from leaving stale ones behind.
+          while IFS=$'\t' read -r key group; do
+            [ -n "${key}" ] || continue
+            title="Upstream drift: ${group}"
+            file="${DRIFT_DIR}/${key}.md"
+
+            matches="$(find_issue open "${title}")"
+            open_issue="${matches%%$'\n'*}"
+
+            if [ ! -s "${file}" ]; then
+              if [ -n "${open_issue}" ]; then
+                gh issue comment "${open_issue}" \
+                  --body "$(printf '%s pins match upstream again as of %s — closing.\n\n%s\n' "${group}" "${today}" "${resolved}")"
+                gh issue close "${open_issue}"
+                printf -- '- %s: drift cleared, closed #%s\n' "${group}" "${open_issue}" >> "$GITHUB_STEP_SUMMARY"
+              else
+                printf -- '- %s: pins match upstream\n' "${group}" >> "$GITHUB_STEP_SUMMARY"
+              fi
+              continue
+            fi
+
+            # A daily job that re-posted the same drift every morning would be muted within a week.
+            # The fingerprint is what makes a repeat cheap to recognise: same drift, no post.
+            fingerprint="${key} $(sha256sum "${file}" | cut -c1-12)"
+            body="$(printf '**%s** — the daily upstream check saw this on %s:\n\n%s\n\n%s\n\n<!-- upstream-drift: %s -->\n' \
+              "${group}" "${today}" "$(cat "${file}")" "${REPIN_HINT}" "${fingerprint}")"
+
+            if [ -n "${open_issue}" ]; then
+              seen="$(gh issue view "${open_issue}" --json body,comments --jq '.body, .comments[].body')"
+              if [[ "${seen}" == *"${fingerprint}"* ]]; then
+                printf -- '- %s: unchanged, already on #%s\n' "${group}" "${open_issue}" >> "$GITHUB_STEP_SUMMARY"
+              else
+                gh issue comment "${open_issue}" --body "${body}"
+                printf -- '- %s: drift changed, commented on #%s\n' "${group}" "${open_issue}" >> "$GITHUB_STEP_SUMMARY"
+              fi
+              continue
+            fi
+
+            # Nothing open. If this exact drift was reported before and a *person* closed it — as
+            # opposed to this job closing it because upstream moved back — that was a decision to
+            # skip the update, and re-filing it tomorrow would be nagging.
+            matches="$(find_issue closed "${title}")"
+            closed_issue="${matches%%$'\n'*}"
+            if [ -n "${closed_issue}" ]; then
+              seen="$(gh issue view "${closed_issue}" --json body,comments --jq '.body, .comments[].body')"
+              if [[ "${seen}" == *"${fingerprint}"* && "${seen}" != *"${resolved}"* ]]; then
+                printf -- '- %s: same drift dismissed on #%s, not re-filing\n' "${group}" "${closed_issue}" >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+            fi
+
+            url="$(gh issue create --title "${title}" --body "${body}")"
+            printf -- '- %s: opened %s\n' "${group}" "${url}" >> "$GITHUB_STEP_SUMMARY"
+          done < "${DRIFT_DIR}/groups.tsv"
