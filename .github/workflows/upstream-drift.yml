@@ -42,7 +42,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       # Named here rather than in the script so each repository says its own thing without the
       # shared checker growing repository-specific prose.
-      REPIN_HINT: 'Pins live in `Directory.Build.props`; `./build/BumpNativeVersion.sh <version>` does the mechanical part.'
+      REPIN_HINT: 'Pins live in `Directory.Build.props`: update the platform package version property and bump the binding revision; keep the README pins in step.'
     steps:
       - uses: actions/checkout@v4
 

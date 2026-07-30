@@ -19,7 +19,11 @@
 #            NuGet package id
 #   confirm  download URL template with {version}, or "-" to derive it from the locator
 #
-# group	label	kind	pin	locator	confirm
-Platform packages	FFmpegKit.Net.*.Android	nuget	FFmpegKitAndroidPackageVersion	FFmpegKit.Net.Full.Android	-
-Platform packages	FFmpegKit.Net.*.iOS	nuget	FFmpegKitIosPackageVersion	FFmpegKit.Net.Full.iOS	-
-Platform packages	FFmpegKit.Net.*.Mac	nuget	FFmpegKitMacPackageVersion	FFmpegKit.Net.Full.Mac	-
+#   source   owner/repo publishing the component - optional, and only meaningful on nuget
+#            rows, where the drift finding links that repository's release notes for the
+#            version it reports
+#
+# group	label	kind	pin	locator	confirm	source
+Platform packages	FFmpegKit.Net.*.Android	nuget	FFmpegKitAndroidPackageVersion	FFmpegKit.Net.Full.Android	-	sbokatuk/FFmpegKit.Android
+Platform packages	FFmpegKit.Net.*.iOS	nuget	FFmpegKitIosPackageVersion	FFmpegKit.Net.Full.iOS	-	sbokatuk/FFmpegKit.iOS
+Platform packages	FFmpegKit.Net.*.Mac	nuget	FFmpegKitMacPackageVersion	FFmpegKit.Net.Full.Mac	-	sbokatuk/FFmpegKit.Mac
