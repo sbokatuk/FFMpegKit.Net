@@ -205,6 +205,23 @@ strip_expr() { case "$1" in */*:*) printf '%s' "${1#*:}" ;; *) printf 's/^//' ;;
 # `pod install` finds the bytes, and is exactly what this repository's fetch-*.sh scripts already
 # resolve - so a version this script confirms is one the existing tooling can fetch.
 
+# For a component published from one of this author's own repositories - the nuget rows, whose
+# optional seventh manifest column names the owner/repo - a drift finding can carry more than the
+# version: the changelog for it already exists, because in these families merging
+# docs/release-notes/<version>.md IS the release. So the finding links straight to that note, and
+# the issue asking for a re-pin says what the re-pin brings. HEAD rather than a branch name,
+# because the repositories disagree on master versus main and a blob URL under HEAD follows the
+# default branch either way. The note file is confirmed before it is linked, in the same spirit as
+# every other pointer here; when it is missing (a release cut before the convention, say) the
+# releases page is the honest fallback.
+sibling_links() { # sibling_links <owner/repo> <version>
+    if fetch -r 0-0 -o /dev/null "https://raw.githubusercontent.com/$1/HEAD/docs/release-notes/$2.md" 2>/dev/null; then
+        printf ' · [release notes](https://github.com/%s/blob/HEAD/docs/release-notes/%s.md) · [releases](https://github.com/%s/releases)' "$1" "$2" "$1"
+    else
+        printf ' · [releases](https://github.com/%s/releases)' "$1"
+    fi
+}
+
 # CocoaPods' CDN shards a pod's spec directory by the first three hex digits of the *pod name's*
 # MD5 (not the version's), so every version of a pod lives under the same shard.
 podspec_url() { # <PodName> <version>
@@ -253,7 +270,9 @@ download_url() { # download_url <kind> <locator> <confirm-template> <version>
 # --- the pass ------------------------------------------------------------------------------
 
 checked=0
-while IFS=$'\t' read -r group label kind pin locator confirm; do
+# src is the optional seventh column and most manifests stop at six; read leaves it empty there,
+# which is every row except the sibling-package nuget ones.
+while IFS=$'\t' read -r group label kind pin locator confirm src; do
     case "${group}" in ''|'#'*) continue ;; esac
     checked=$((checked + 1))
 
@@ -327,7 +346,8 @@ while IFS=$'\t' read -r group label kind pin locator confirm; do
         # as a pin ahead of upstream and say nothing.
         case "${current}" in
             *-*)
-                note "${group}" "**${label}**: pinned the prerelease \`${current}\` while \`${latest}\` is published on nuget.org — a released umbrella must not depend on a beta. Re-pin \`${pin}\` in \`Directory.Build.props\`."
+                links=""; [ -z "${src}" ] || links="$(sibling_links "${src}" "${latest}" || true)"
+                note "${group}" "**${label}**: pinned the prerelease \`${current}\` while \`${latest}\` is published on nuget.org — a released umbrella must not depend on a beta. Re-pin \`${pin}\` in \`Directory.Build.props\`.${links}"
                 continue
                 ;;
         esac
@@ -338,7 +358,8 @@ while IFS=$'\t' read -r group label kind pin locator confirm; do
         else
             url="$(download_url nuget "${locator}" "${confirm}" "${latest}" || true)"
             if [ -n "${url}" ] && downloadable "${url}"; then
-                note "${group}" "**${label}**: pinned \`${current}\`, but \`${latest}\` is published on nuget.org — re-pin \`${pin}\` in \`Directory.Build.props\`. [nupkg](${url})"
+                links=""; [ -z "${src}" ] || links="$(sibling_links "${src}" "${latest}" || true)"
+                note "${group}" "**${label}**: pinned \`${current}\`, but \`${latest}\` is published on nuget.org — re-pin \`${pin}\` in \`Directory.Build.props\`. [nupkg](${url})${links}"
             else
                 echo "    -   ${label}: ${latest} is indexed but its .nupkg does not download yet (pinned ${current})"
             fi
