@@ -24,7 +24,7 @@ public static class Packages
     /// that forgets to update the other is caught by <see cref="CrossPlatformPackageTests"/>
     /// rather than discovered at restore time by a consumer.
     /// </summary>
-    public const string AndroidPackageVersion = "8.1.2.5";
+    public const string AndroidPackageVersion = "8.1.3.1";
     public const string IosPackageVersion = "8.1.2.3";
     public const string MacPackageVersion = "8.1.2.2";
 
@@ -133,7 +133,7 @@ public static class Packages
 
     /// <summary>
     /// The pinned version of one dependency under a target framework group, or null if that
-    /// dependency is not declared there. The brackets ("[8.1.2.5]") NuGet writes for an exact
+    /// dependency is not declared there. The brackets ("[8.1.3.1]") NuGet writes for an exact
     /// version pin are stripped, since the tests compare against the plain version string.
     /// </summary>
     public static string? DependencyVersion(XDocument nuspec, string targetFramework, string dependencyId)

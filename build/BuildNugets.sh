@@ -11,8 +11,8 @@ set -euo pipefail
 #
 # Usage:
 #   ./build/BuildNugets.sh                              # version from Directory.Build.props
-#   ./build/BuildNugets.sh 8.1.2-beta.4                  # explicit package version
-#   ./build/BuildNugets.sh 8.1.2-beta.4 8.1.2.4 8.1.2.1  # override the Android/iOS package pins
+#   ./build/BuildNugets.sh 8.1.3-beta.4                  # explicit package version
+#   ./build/BuildNugets.sh 8.1.3-beta.4 8.1.3.1 8.1.2.3 8.1.2.2  # override the Android/iOS/Mac package pins
 #
 # Requires macOS: both packages multi-target Android and iOS together, so restoring either needs
 # the iOS workload regardless of which platform's code is being exercised.

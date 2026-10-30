@@ -78,7 +78,8 @@ versions itself, and how to build them from source are questions for their own r
 
 Android, iOS and macOS binding versions are pinned independently in
 [Directory.Build.props](Directory.Build.props) and do not track each other - see that file's
-comments before assuming one implies another.
+comments before assuming one implies another. So the platforms can carry different FFmpeg versions:
+this repository's version names the newest of them, and each release note lists them per platform.
 
 **macOS is supported by the cross-platform client only** (`net*-macos`, via
 [sbokatuk/FFmpegKit.Mac][ffmpegkit-mac]): a plain .NET for macOS or AppKit app references

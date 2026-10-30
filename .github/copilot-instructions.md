@@ -13,7 +13,7 @@
 - It builds **no native code and no bindings**. The platform bindings are consumed as already-published
   NuGet packages from sbokatuk/FFmpegKit.Android, sbokatuk/FFmpegKit.iOS and sbokatuk/FFmpegKit.Mac,
   pinned to exact versions in `Directory.Build.props`.
-- Version = `$(FFmpegVersion).$(FFmpegKitBindingRevision)` (8.1.2 + 3 → `VersionPrefix` 8.1.2.3). The revision
+- Version = `$(FFmpegVersion).$(FFmpegKitBindingRevision)` (8.1.3 + 1 → `VersionPrefix` 8.1.3.1). The revision
   belongs to this repository only; the three binding pins version independently of it and of each other.
 - The GitHub repository is spelled `FFMpegKit.Net`, but every in-repo reference — solution, package ids,
   URLs — writes `FFmpegKit.Net`. Keep it that way.
@@ -94,9 +94,9 @@
 - Touching packaging, pins or a `.csproj`: pack first, then run PackageTests, and update the pins mirrored in
   `tests/FFmpegKit.Net.PackageTests/Packages.cs`.
 - Touching the client's platform code: run the device tiers, which take `[VARIANT] VERSION [TARGET_FRAMEWORK]`:
-  - `FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8.1.2.3 net9.0-android35.0`
-  - `./.github/scripts/run-simulator-tests.sh Video 8.1.2.3 net9.0-ios18.0`
-  - `./.github/scripts/run-mac-host-tests.sh Video 8.1.2.3 net9.0-macos15.0`
+  - `FFMPEGKIT_DEVICE_RID=android-arm64 ./.github/scripts/run-device-tests.sh Video 8.1.3.1 net9.0-android35.0`
+  - `./.github/scripts/run-simulator-tests.sh Video 8.1.3.1 net9.0-ios18.0`
+  - `./.github/scripts/run-mac-host-tests.sh Video 8.1.3.1 net9.0-macos15.0`
 
 ## Hard rules
 
@@ -114,8 +114,10 @@
   ships a broken package that only PackageTests catch.
 - Keep the licence machinery intact: the per-variant `MIT AND …` expression plus both licence texts packed,
   and no repository-wide `PackageLicenseExpression`.
-- Version bumps: a new binding revision bumps `FFmpegKitBindingRevision`; a new FFmpeg line changes
-  `FFmpegVersion` and all three pins, deliberately. The release-note file name must equal the version.
+- Version bumps: a new binding revision bumps `FFmpegKitBindingRevision`. When a pin brings a newer FFmpeg,
+  `FFmpegVersion` follows the newest one and the revision restarts at 1, even if the other pins stay on an
+  older FFmpeg; the release note then states the FFmpeg version per platform. The release-note file name
+  must equal the version.
 
 ## References
 
