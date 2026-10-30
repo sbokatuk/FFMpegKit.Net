@@ -57,7 +57,7 @@
     <!--
       Which build of the FFmpegKit packages to demo. Defaults to VersionPrefix from
       Directory.Build.props - the full four-part version including the binding revision - so it
-      tracks the repository automatically; pass -p:FFmpegKitVersion=8.1.2-beta.4 to try a
+      tracks the repository automatically; pass -p:FFmpegKitVersion=8.1.3-beta.4 to try a
       specific build.
 
       Not the three-part FFmpegVersion: "8.1.2" is a floor, not an exact version, and NuGet's
@@ -85,7 +85,9 @@
     ordinary NuGet package independent of the installed workload pack, so pinning it restores
     cleanly. On net8 that floor is FFmpegKit.Net.Maui's own 8.0.100 rather than the toolkit's
     8.0.71 - see FFmpegKitMauiControlsVersion in src/FFmpegKit.Net.Maui/FFmpegKit.Net.Maui.csproj;
-    a sample pinned under the package it consumes fails restore with NU1605.
+    a sample pinned under the package it consumes fails restore with NU1605. On net9 the pin sits
+    above the floor on purpose: with Controls 9.0.30 the app never draws its first frame on an
+    iOS 26 simulator, stuck in a UIKit layout loop under Shell's tab bar controller.
   -->
   <ItemGroup Condition="$(TargetFramework.StartsWith('net8.0'))">
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
@@ -96,7 +98,7 @@
   <ItemGroup Condition="$(TargetFramework.StartsWith('net9.0'))">
     <PackageReference Include="CommunityToolkit.Maui" Version="11.0.0" />
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="6.0.1" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.30" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
   </ItemGroup>
   <ItemGroup Condition="$(TargetFramework.StartsWith('net10.0'))">
