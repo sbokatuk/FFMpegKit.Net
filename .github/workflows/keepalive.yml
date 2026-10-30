@@ -1,0 +1,47 @@
+name: workflow keepalive
+
+# GitHub disables every scheduled workflow in a public repository once the repository has seen no
+# activity for 60 days, and it does so silently. The watchers here - upstream-drift.yml and, where
+# they exist, upstream-watch.yml and weekly-drift.yml - are meant to keep reporting while nothing
+# is being committed, which is exactly when they get switched off: in October 2026 22 of the 23
+# repositories in these families had theirs disabled this way, and upstream releases went
+# unreported for weeks.
+#
+# Re-enabling a workflow through the API restarts its 60-day clock without a commit, so this does
+# that weekly for every workflow still in the `active` state - itself included, which is what
+# keeps the keepalive alive. Workflows switched off by hand (`disabled_manually`) are left alone:
+# that is a decision, not drift. A workflow that has already been disabled for inactivity is left
+# alone too - by then this one has been disabled as well, and `gh workflow enable` is the fix.
+#
+# Kept byte-identical across every repository in these families that has a scheduled workflow.
+
+on:
+  schedule:
+    # Mondays, 05:41 UTC - off the full hour, where GitHub sheds scheduled runs under load.
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  keepalive:
+    # Forks keep their own schedules, or none.
+    if: github.repository_owner == 'sbokatuk'
+    name: re-enable active workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: re-enable every active workflow
+        run: |
+          set -euo pipefail
+          # Only files under .github/workflows: the list also carries GitHub's own dynamic
+          # workflows (Copilot, Pages), which cannot be enabled or disabled through this API.
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows" --paginate \
+              --jq '.workflows[] | select(.state == "active" and (.path | startswith(".github/workflows/"))) | [.id, .path] | @tsv' \
+            | while IFS=$'\t' read -r id path; do
+                gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/enable" > /dev/null
+                printf -- '- re-enabled `%s`\n' "${path}" | tee -a "${GITHUB_STEP_SUMMARY}"
+              done
