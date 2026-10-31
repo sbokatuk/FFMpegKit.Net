@@ -232,6 +232,24 @@ podspec_url() { # <PodName> <version>
       "${md5:0:1}" "${md5:1:1}" "${md5:2:1}" "$1" "$2" "$1"
 }
 
+# Stage 2 for a CocoaPods *source* pod, whose podspec has source.git and a tag where a binary pod
+# has source.http. There is no archive to download, so the evidence is the tag on the repository
+# itself: the podspec naming one is only another index entry, and a tag that is not there is what
+# `pod install` would die on.
+#
+# Prints the tag, and returns git's own answer: 0 the tag is there, 2 it is not, anything above
+# that the repository could not be asked. Returns 1 when there is nothing to ask: not a source
+# pod, no tag in its source, or a podspec that could not be read. The `--` is because the URL is
+# vendor data, and one with a leading dash would be an option to git.
+source_pod_tag() { # <PodName> <version>
+    local repo tag
+    read -r repo tag <<<"$(fetch "$(podspec_url "$1" "$2")" \
+      | jq_lines 'import sys,json;s=json.load(sys.stdin).get("source",{});print(s.get("git",""),s.get("tag",""))')"
+    [ -n "${tag}" ] || return 1
+    printf '%s' "${tag}"
+    GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code --tags --refs -- "${repo}" "refs/tags/${tag}" >/dev/null 2>&1
+}
+
 download_url() { # download_url <kind> <locator> <confirm-template> <version>
     local kind="$1" locator="$2" confirm="$3" version="$4"
 
@@ -402,7 +420,19 @@ while IFS=$'\t' read -r group label kind pin locator confirm src; do
                 note "${group}" "**${label}**: \`${latest}\` is tagged upstream (pinned \`${current}\`) — built from source, so there is no archive to verify."
                 ;;
             *)
-                note "${group}" "**${label}**: \`${latest}\` is published (pinned \`${current}\`), but no download URL could be resolved for it — check by hand before re-pinning."
+                # A CocoaPods source pod (netless's Whiteboard) has no download URL either, and its
+                # tag settles it the way an archive would: a finding if it is there, the log if it
+                # is not yet. Anything else with no URL is genuinely unexplained, as is a repository
+                # that would not answer, and earns a hand check rather than silence.
+                tag=""; rc=1
+                if [ "${kind}" = cocoapods ]; then
+                    rc=0; tag="$(source_pod_tag "${locator}" "${latest}")" || rc=$?
+                fi
+                case "${rc}" in
+                    0) note "${group}" "**${label}**: \`${latest}\` is published (pinned \`${current}\`) — a source pod, confirmed by its git tag \`${tag}\`, so there is no archive to verify." ;;
+                    2) echo "    -   ${label}: ${latest} is indexed but its tag ${tag} is not on the repository yet (pinned ${current})" ;;
+                    *) note "${group}" "**${label}**: \`${latest}\` is published (pinned \`${current}\`), but no download URL could be resolved for it — check by hand before re-pinning." ;;
+                esac
                 ;;
         esac
     elif downloadable "${url}"; then
